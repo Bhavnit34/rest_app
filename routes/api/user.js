@@ -15,11 +15,18 @@ router.get('/products', function(req,res){
     res.send('api working');
 });
 
-router.get('/getUser', function(req,resBody){
+router.post('/addUser', function(req,res_body){
     // make a jawbone REST request for user info
+    if (!req.body.token.toString().trim()){
+        return res_body.json({
+            message: "Token missing!",
+            error: true
+        })
+    }
     var options = {
         host: 'jawbone.com',
         path: '/nudge/api/v.1.1/users/@me',
+        headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     }
     var body = "";
@@ -33,12 +40,15 @@ router.get('/getUser', function(req,resBody){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            resBody.send(JSON.stringify(json_res, null, 4));
+            res_body.send(JSON.stringify(json_res, null, 4));
             loadUserInfo();
         })
         req.on('error', function(e) {
             console.error(e);
-            resBody.send("error");
+            return res_body.json({
+                message: e.message,
+                error: true
+            })
         });
     });
     req.end();
@@ -70,6 +80,7 @@ router.get('/getUser', function(req,resBody){
     }
 
 });
+
 
 
 //return router

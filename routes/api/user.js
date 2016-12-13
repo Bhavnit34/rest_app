@@ -11,8 +11,8 @@ AWS.config.update({
 var docClient = new AWS.DynamoDB.DocumentClient();
 
 // routes
-router.get('/products', function(req,res){
-    res.send('api working');
+router.get('/test', function(req,res){
+    res.send('user working');
 });
 
 router.post('/addUser', function(req,res_body){

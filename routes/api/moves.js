@@ -13,11 +13,11 @@ var docClient = new AWS.DynamoDB.DocumentClient();
 
 
 router.get('/test', function(req,res){
-    res.send('body working');
+    res.send('user working');
 });
 
-router.post('/updateBodyEvents', function(req,res_body){
-    // make a jawbone REST request for body_events info
+router.post('/updateMoves', function(req,res_body){
+    // make a jawbone REST request for moves info
     if (!req.body.token.toString().trim()){
         return res_body.json({
             message: "Token missing!",
@@ -26,7 +26,7 @@ router.post('/updateBodyEvents', function(req,res_body){
     }
     var options = {
         host: 'jawbone.com',
-        path: '/nudge/api/v.1.1/users/@me/body_events',
+        path: '/nudge/api/v.1.1/users/@me/moves',
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     };
@@ -41,9 +41,9 @@ router.post('/updateBodyEvents', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            json_res = api.clearEmptyString(json_res);
+            json_res = api.clearEmptyStrings(json_res);
             res_body.send(JSON.stringify(json_res, null, 4));
-            putBodyEvents();
+            putMoves();
 
 
         });
@@ -58,9 +58,9 @@ router.post('/updateBodyEvents', function(req,res_body){
     req.end();
 
 
-    // Load user info into db
-    var putBodyEvents = function () {
-        var table = "Body";
+    // Load moves info into db
+    var putMoves = function () {
+        var table = "Moves";
         var user_id = json_res.meta.user_xid;
 
         //loop through each day and add/update the db row
@@ -70,14 +70,14 @@ router.post('/updateBodyEvents', function(req,res_body){
                 TableName: table,
                 Item: {
                     "user_id": user_id,
-                    "timestamp": json_res.data.items[i].time_created,
+                    "timestamp_completed": json_res.data.items[i].time_completed,
                     "date": date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
                     "info": json_res.data.items[i]
                 }
             };
 
             // update table
-            console.log("Adding body_event " + (i+1) + " --> " +  date + " for user " + user_id);
+            console.log("Adding moves " + (i+1) + " --> " +  date + " for user " + user_id);
             docClient.put(params, function (err, data) {
                 if (err) {
                     console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));

@@ -24,6 +24,7 @@ app.use('/', require('./routes/index'));
 app.use('/api/user', require('./routes/api/user'));
 app.use('/api/body', require('./routes/api/body'));
 app.use('/api/moves', require('./routes/api/moves'));
+app.use('/api/heartrate', require('./routes/api/heartrate'));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

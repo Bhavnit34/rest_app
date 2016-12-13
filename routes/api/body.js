@@ -25,7 +25,7 @@ router.post('/updateBodyEvents', function(req,res_body){
     }
     var options = {
         host: 'jawbone.com',
-        path: '/nudge/api/v.1.1/users/@me',
+        path: '/nudge/api/v.1.1/users/@me/body_events',
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     };
@@ -40,9 +40,24 @@ router.post('/updateBodyEvents', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
+
+
+            // change empty strings to null as db doesn't allow it
+            for(var i = 0; i < json_res.data.size; i++) {
+                for (var key in json_res.data.items[i]) {
+                    var attrName = key.toString();
+                    var value = json_res.data.items[i][attrName];
+                    if (value == "") {
+                        json_res.data.items[i][attrName] = null
+                    }
+                }
+            }
+
             res_body.send(JSON.stringify(json_res, null, 4));
-            loadUserInfo();
-        })
+            putBodyEvents();
+
+
+        });
         req.on('error', function(e) {
             console.error(e);
             return res_body.json({
@@ -54,33 +69,36 @@ router.post('/updateBodyEvents', function(req,res_body){
     req.end();
 
 
-
     // Load user info into db
-    var loadUserInfo = function () {
-        var table = "User";
-        var user_id = json_res.data.xid;
-        json_res.data.image = "none";
-        var params = {
-            TableName: table,
-            Item: {
-                "user_id": user_id,
-                "info": json_res.data
-            }
-        };
+    var putBodyEvents = function () {
+        var table = "Body";
+        var user_id = json_res.meta.user_xid;
 
+        //loop through each day and add/update the db row
+        for (var i=0; i < json_res.data.size ; i++) {
+            var date = json_res.data.items[i].date.toString();
+            var params = {
+                TableName: table,
+                Item: {
+                    "user_id": user_id,
+                    "timestamp": json_res.data.items[i].time_created,
+                    "date": date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
+                    "info": json_res.data.items[i]
+                }
+            };
 
-        console.log("Adding a new item...");
-        docClient.put(params, function (err, data) {
-            if (err) {
-                console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
-            } else {
-                console.log("Added item:", JSON.stringify(data, null, 2));
-            }
-        });
+            // update table
+            console.log("Adding body_event " + (i+1) + " --> " +  date + " for user " + user_id);
+            docClient.put(params, function (err, data) {
+                if (err) {
+                    console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                } else {
+                    console.log("item added");
+                }
+            });
+        }
     }
 
 });
-
-
 
 module.exports = router;

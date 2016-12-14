@@ -13,12 +13,12 @@ var docClient = new AWS.DynamoDB.DocumentClient();
 
 
 router.get('/test', function(req,res){
-    res.send('user working');
+    res.send('workouts working');
 });
 
-router.post('/updateMoves', function(req,res_body){
-    // make a jawbone REST request for moves info
-    var path = '/nudge/api/v.1.1/users/@me/moves?';
+router.post('/updateWorkouts', function(req,res_body){
+    // make a jawbone REST request for workouts info
+    var path = '/nudge/api/v.1.1/users/@me/workouts?';
 
     // authenticate token
     if (!req.body.token.toString().trim()){
@@ -71,8 +71,11 @@ router.post('/updateMoves', function(req,res_body){
         res.on('end', function() {
             json_res = JSON.parse(body);
             json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
+            for (var i= 0; i < json_res.data.size; i++) {
+                api.clearEmptyDataStrings(json_res.data.items[i].details);
+            }
             res_body.send(JSON.stringify(json_res, null, 4));
-            putMoves();
+            putSleeps();
 
 
         });
@@ -87,9 +90,9 @@ router.post('/updateMoves', function(req,res_body){
     req.end();
 
 
-    // Load moves info into db
-    var putMoves = function () {
-        var table = "Moves";
+    // Load workouts info into db
+    var putSleeps = function () {
+        var table = "Workouts";
         var user_id = json_res.meta.user_xid;
 
         //loop through each day and add/update the db row
@@ -106,7 +109,7 @@ router.post('/updateMoves', function(req,res_body){
             };
 
             // update table
-            console.log("Adding moves " + (i+1) + " --> " +  date + " for user " + user_id);
+            console.log("Adding workout " + (i+1) + " --> " +  date + " for user " + user_id);
             docClient.put(params, function (err, data) {
                 if (err) {
                     console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));

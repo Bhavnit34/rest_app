@@ -26,10 +26,10 @@ router.post('/updateMood', function(req,res_body){
     }
 
     // add date to query if given
-    var path = '/nudge/api/v.1.1/users/@me/mood';
+    var path = '/nudge/api/v.1.1/users/@me/mood?';
     if (req.body.date){
         if (req.body.date.toString().match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) { //match YYYYMMDD
-            path += "?date=" + req.body.date;
+            path += "date=" + req.body.date;
         } else {
             return res_body.json({
                 message: "Please use date format YYYYMMDD",

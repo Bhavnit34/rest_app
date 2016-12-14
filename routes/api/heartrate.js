@@ -18,8 +18,7 @@ router.get('/test', function(req,res){
 
 router.post('/updateHeartRates', function(req,res_body){
     // make a jawbone REST request for heart rate info
-    var path = '/nudge/api/v.1.1/users/@me/heartrates';
-
+    var path = '/nudge/api/v.1.1/users/@me/heartrates?';
     // authenticate token
     if (!req.body.token.toString().trim()){
         return res_body.json({
@@ -31,7 +30,7 @@ router.post('/updateHeartRates', function(req,res_body){
     // add date to query if given
     if (req.body.date){
         if (req.body.date.toString().match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) { //match YYYYMMDD
-            path += "?date=" + req.body.date;
+            path += "&date=" + req.body.date;
         } else {
             return res_body.json({
                 message: "Please use date format YYYYMMDD",
@@ -43,7 +42,7 @@ router.post('/updateHeartRates', function(req,res_body){
     // add limit to query if given
     if (req.body.limit) {
         if(typeof req.body.limit == "number") {
-            path+= "?limit=" + parseInt(req.body.limit);
+            path+= "&limit=" + parseInt(req.body.limit);
         } else {
             return res_body.json({
                 message: "Limit must be an integer",

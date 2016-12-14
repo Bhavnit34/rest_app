@@ -18,7 +18,7 @@ router.get('/test', function(req,res){
 
 router.post('/updateMood', function(req,res_body){
     // make a jawbone REST request for mood info
-    if (!req.body.token.toString().trim()){
+    if (!req.body.token){
         return res_body.json({
             message: "Token missing!",
             error: true

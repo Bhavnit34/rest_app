@@ -21,7 +21,7 @@ router.post('/updateBodyEvents', function(req,res_body){
     var path = '/nudge/api/v.1.1/users/@me/body_events?';
 
     // authenticate token
-    if (!req.body.token.toString().trim()){
+    if (!req.body.token){
         return res_body.json({
             message: "Token missing!",
             error: true

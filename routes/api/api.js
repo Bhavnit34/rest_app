@@ -27,7 +27,20 @@ module.exports = {
         return json;
     },
 
-
+    newReturnJson: function() {
+        var json =
+            {
+                Jawbone: {
+                    message : "",
+                    error : false
+                },
+                DynamoDB: {
+                    message : "",
+                    error : false
+                }
+            };
+        return json;
+    }
 };
 
 

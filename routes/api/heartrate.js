@@ -20,7 +20,7 @@ router.post('/updateHeartRates', function(req,res_body){
     // make a jawbone REST request for heart rate info
     var path = '/nudge/api/v.1.1/users/@me/heartrates?';
     // authenticate token
-    if (!req.body.token.toString().trim()){
+    if (!req.body.token){
         return res_body.json({
             message: "Token missing!",
             error: true

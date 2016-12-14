@@ -24,9 +24,23 @@ router.post('/updateMood', function(req,res_body){
             error: true
         })
     }
+
+    // add date to query if given
+    var path = '/nudge/api/v.1.1/users/@me/mood';
+    if (req.body.date){
+        if (req.body.date.toString().match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) { //match YYYYMMDD
+            path += "?date=" + req.body.date;
+        } else {
+            return res_body.json({
+                message: "Please use date format YYYYMMDD",
+                error: true
+            })
+        }
+    }
+    console.log(path);
     var options = {
         host: 'jawbone.com',
-        path: '/nudge/api/v.1.1/users/@me/mood',
+        path: path,
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     };
@@ -41,6 +55,14 @@ router.post('/updateMood', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
+
+            if (Object.keys(json_res.data).length < 1) {
+                return res_body.json({
+                    message: "No mood recorded for this day",
+                    error: false
+                })
+            }
+
             json_res.data = api.clearEmptyDataStrings(json_res.data);
             res_body.send(JSON.stringify(json_res, null, 4));
             putMoodEvents();

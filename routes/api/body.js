@@ -18,15 +18,42 @@ router.get('/test', function(req,res){
 
 router.post('/updateBodyEvents', function(req,res_body){
     // make a jawbone REST request for body_events info
+    var path = '/nudge/api/v.1.1/users/@me/body_events';
+
+    // authenticate token
     if (!req.body.token.toString().trim()){
         return res_body.json({
             message: "Token missing!",
             error: true
         })
     }
+
+    // add date to query if given
+    if (req.body.date){
+        if (req.body.date.toString().match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) { //match YYYYMMDD
+            path += "?date=" + req.body.date;
+        } else {
+            return res_body.json({
+                message: "Please use date format YYYYMMDD",
+                error: true
+            })
+        }
+    }
+
+    // add limit to query if given
+    if (req.body.limit) {
+        if(typeof req.body.limit == "number") {
+            path+= "?limit=" + parseInt(req.body.limit);
+        } else {
+            return res_body.json({
+                message: "Limit must be an integer",
+                error: true
+            })
+        }
+    }
     var options = {
         host: 'jawbone.com',
-        path: '/nudge/api/v.1.1/users/@me/body_events',
+        path: path,
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     };

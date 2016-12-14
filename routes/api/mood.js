@@ -13,11 +13,11 @@ var docClient = new AWS.DynamoDB.DocumentClient();
 
 
 router.get('/test', function(req,res){
-    res.send('user working');
+    res.send('mood working');
 });
 
-router.post('/updateMoves', function(req,res_body){
-    // make a jawbone REST request for moves info
+router.post('/updateMood', function(req,res_body){
+    // make a jawbone REST request for mood info
     if (!req.body.token.toString().trim()){
         return res_body.json({
             message: "Token missing!",
@@ -26,7 +26,7 @@ router.post('/updateMoves', function(req,res_body){
     }
     var options = {
         host: 'jawbone.com',
-        path: '/nudge/api/v.1.1/users/@me/moves',
+        path: '/nudge/api/v.1.1/users/@me/mood',
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     };
@@ -41,9 +41,9 @@ router.post('/updateMoves', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
+            json_res.data = api.clearEmptyDataStrings(json_res.data);
             res_body.send(JSON.stringify(json_res, null, 4));
-            putMoves();
+            putMoodEvents();
 
 
         });
@@ -58,34 +58,32 @@ router.post('/updateMoves', function(req,res_body){
     req.end();
 
 
-    // Load moves info into db
-    var putMoves = function () {
-        var table = "Moves";
+    // Load user info into db
+    var putMoodEvents = function () {
+        var table = "Mood";
         var user_id = json_res.meta.user_xid;
+        var date = json_res.data.date.toString();
 
-        //loop through each day and add/update the db row
-        for (var i=0; i < json_res.data.size ; i++) {
-            var date = json_res.data.items[i].date.toString();
-            var params = {
-                TableName: table,
-                Item: {
-                    "user_id": user_id,
-                    "timestamp_completed": json_res.data.items[i].time_completed,
-                    "date": date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
-                    "info": json_res.data.items[i]
-                }
-            };
+        var params = {
+            TableName: table,
+            Item: {
+                "user_id": user_id,
+                "timestamp": json_res.data.time_created,
+                "date": date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
+                "info": json_res.data
+            }
+        };
 
-            // update table
-            console.log("Adding moves " + (i+1) + " --> " +  date + " for user " + user_id);
-            docClient.put(params, function (err, data) {
-                if (err) {
-                    console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
-                } else {
-                    console.log("item added");
-                }
-            });
-        }
+        // update table
+        console.log("Adding mood " +  date + " for user " + user_id);
+        docClient.put(params, function (err, data) {
+            if (err) {
+                console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                console.log("item added");
+            }
+        });
+
     }
 
 });

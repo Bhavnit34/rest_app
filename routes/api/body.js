@@ -41,7 +41,7 @@ router.post('/updateBodyEvents', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            json_res = api.clearEmptyString(json_res);
+            json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
             res_body.send(JSON.stringify(json_res, null, 4));
             putBodyEvents();
 

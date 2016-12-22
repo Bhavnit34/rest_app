@@ -101,13 +101,13 @@ router.post('/updateWorkouts', function(req,res_body){
         var user_id = json_res.meta.user_xid;
         var successCount = 0;
 
-        //function to loop through each day and add/update the db row synchronously
+        // function to loop through each day and add/update the db row synchronously
         function updateDB(i) {
 
             // handle when all items have been completed, set appropriate return values
             if (i >= json_res.data.size) {
                 if (successCount == json_res.data.size) {
-                    console.log("All items added!")
+                    console.log("All items added!");
                     returnJson.DynamoDB.message = "SUCCESS";
                     returnJson.DynamoDB.error = false;
                     return res_body.status(200).send(returnJson);

@@ -19,13 +19,14 @@ router.get('/test', function(req,res){
 router.post('/updateSleeps', function(req,res_body){
     // make a jawbone REST request for sleeps info
     var path = '/nudge/api/v.1.1/users/@me/sleeps?';
+    var returnJson = api.newReturnJson();
+
 
     // authenticate token
     if (!req.body.token){
-        return res_body.json({
-            message: "Token missing!",
-            error: true
-        })
+        returnJson.Jawbone.message = "Token missing!";
+        returnJson.Jawbone.error = true;
+        return res_body.status(401).send(returnJson);
     }
 
     // add date to query if given
@@ -33,10 +34,9 @@ router.post('/updateSleeps', function(req,res_body){
         if (req.body.date.toString().match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) { //match YYYYMMDD
             path += "&date=" + req.body.date;
         } else {
-            return res_body.json({
-                message: "Please use date format YYYYMMDD",
-                error: true
-            })
+            returnJson.Jawbone.message = "Please use date format YYYYMMDD";
+            returnJson.Jawbone.error = true;
+            return res_body.status(400).send(returnJson);
         }
     }
 
@@ -45,10 +45,9 @@ router.post('/updateSleeps', function(req,res_body){
         if(typeof req.body.limit == "number") {
             path+= "&limit=" + parseInt(req.body.limit);
         } else {
-            return res_body.json({
-                message: "Limit must be an integer",
-                error: true
-            })
+            returnJson.Jawbone.message = "Limit must be an integer";
+            returnJson.Jawbone.error = true;
+            return res_body.status(400).send(returnJson);
         }
     }
 
@@ -70,21 +69,28 @@ router.post('/updateSleeps', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
-            for (var i= 0; i < json_res.data.size; i++) {
-                api.clearEmptyDataStrings(json_res.data.items[i].details);
+            if (res.statusCode != 200) {
+                // REST response BAD, output error
+                returnJson.Jawbone.message = JSON.stringify(json_res, null, 2);
+                returnJson.Jawbone.error = true;
+                return res_body.status(res.statusCode).send(returnJson);
+            } else {
+                json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
+                for (var i = 0; i < json_res.data.size; i++) {
+                    api.clearEmptyDataStrings(json_res.data.items[i].details);
+                }
+                returnJson.Jawbone.message = "SUCCESS";
+                returnJson.Jawbone.error = false;
+                putSleeps();
             }
-            res_body.send(JSON.stringify(json_res, null, 4));
-            putSleeps();
 
 
         });
         req.on('error', function(e) {
             console.error(e);
-            return res_body.json({
-                message: e.message,
-                error: true
-            })
+            returnJson.Jawbone.message = e.message;
+            returnJson.Jawbone.error = true;
+            return res_body.status(500).send(returnJson);
         });
     });
     req.end();
@@ -94,9 +100,28 @@ router.post('/updateSleeps', function(req,res_body){
     var putSleeps = function () {
         var table = "Sleeps";
         var user_id = json_res.meta.user_xid;
+        var successCount = 0;
 
-        //loop through each day and add/update the db row
-        for (var i=0; i < json_res.data.size ; i++) {
+
+        // function to loop through each day and add/update the db row synchronously
+        function updateDB(i){
+
+            // handle when all items have been completed, set appropriate return values
+            if (i >= json_res.data.size) {
+                if (successCount == json_res.data.size) {
+                    console.log("All items added!");
+                    returnJson.DynamoDB.message = "SUCCESS";
+                    returnJson.DynamoDB.error = false;
+                    return res_body.status(200).send(returnJson);
+                } else {
+                    console.error(successCount + "/" + json_res.data.size + " items updated.");
+                    returnJson.DynamoDB.message = successCount + "/" + json_res.data.size + " items updated. See logs.";
+                    returnJson.DynamoDB.error = true;
+                    return res_body.status(500).send(returnJson);
+                }
+            }
+
+            // set unique table parameters
             var date = json_res.data.items[i].date.toString();
             var params = {
                 TableName: table,
@@ -113,12 +138,20 @@ router.post('/updateSleeps', function(req,res_body){
             docClient.put(params, function (err, data) {
                 if (err) {
                     console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                    returnJson.DynamoDB[json_res.data.items[i].date.toString()] = JSON.stringify(err, null, 2);
                 } else {
-                    console.log("item added");
+                    ++successCount;
                 }
+                updateDB(i+1); // call update for next row
             });
+
         }
-    }
+
+        // start at the first index, the function will iterate over all indexes synchronously until complete and return.
+        updateDB(0);
+
+        }
+
 
 });
 

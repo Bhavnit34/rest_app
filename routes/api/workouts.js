@@ -79,9 +79,9 @@ router.post('/updateWorkouts', function(req,res_body){
                 for (var i = 0; i < json_res.data.size; i++) {
                     api.clearEmptyDataStrings(json_res.data.items[i].details);
                 }
-                returnJson.Jawbone.message = "SUCCESS"
+                returnJson.Jawbone.message = "SUCCESS";
                 returnJson.Jawbone.error = false;
-                putSleeps();
+                putWorkouts();
             }
 
         });
@@ -96,7 +96,7 @@ router.post('/updateWorkouts', function(req,res_body){
 
 
     // Load workouts info into db
-    var putSleeps = function () {
+    var putWorkouts = function () {
         var table = "Workouts";
         var user_id = json_res.meta.user_xid;
         var successCount = 0;
@@ -145,7 +145,6 @@ router.post('/updateWorkouts', function(req,res_body){
             })
 
         }
-
         // start at the first index, the function will iterate over all indexes synchronously until complete and return.
         updateDB(0);
 

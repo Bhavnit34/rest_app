@@ -18,15 +18,19 @@ router.get('/test', function(req,res){
 
 router.post('/updateSettings', function(req,res_body){
     // make a jawbone REST request for settings info
+    var path = '/nudge/api/v.1.1/users/@me/workouts?';
+    var returnJson = api.newReturnJson();
+
+    // authenticate token
     if (!req.body.token){
-        return res_body.json({
-            message: "Token missing!",
-            error: true
-        })
+        returnJson.Jawbone.message = "Token missing!";
+        returnJson.Jawbone.error = true;
+        return res_body.status(401).send(returnJson);
     }
+
     var options = {
         host: 'jawbone.com',
-        path: '/nudge/api/v.1.1/users/@me/settings',
+        path: path,
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     };
@@ -41,17 +45,22 @@ router.post('/updateSettings', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            res_body.send(JSON.stringify(json_res, null, 4));
-            putSettings();
-
-
+            if (res.statusCode != 200) {
+                // REST response BAD, output error
+                returnJson.Jawbone.message = JSON.stringify(json_res, null, 2);
+                returnJson.Jawbone.error = true;
+                return res_body.status(res.statusCode).send(returnJson);
+            } else {
+                returnJson.Jawbone.message = "SUCCESS";
+                returnJson.Jawbone.error = false;
+                putSettings();
+            }
         });
         req.on('error', function(e) {
             console.error(e);
-            return res_body.json({
-                message: e.message,
-                error: true
-            })
+            returnJson.Jawbone.message = e.message;
+            returnJson.Jawbone.error = true;
+            return res_body.status(500).send(returnJson);
         });
     });
     req.end();
@@ -75,8 +84,14 @@ router.post('/updateSettings', function(req,res_body){
         docClient.put(params, function (err, data) {
             if (err) {
                 console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                returnJson.DynamoDB.message = JSON.stringify(err, null, 2);
+                returnJson.DynamoDB.error = true;
+                return res_body.status(500).send(returnJson);
             } else {
                 console.log("item added");
+                returnJson.DynamoDB.message = "SUCCESS";
+                returnJson.DynamoDB.error = false;
+                return res_body.status(200).send(returnJson);
             }
         });
 

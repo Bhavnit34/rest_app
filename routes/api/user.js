@@ -34,11 +34,11 @@ router.post('/addUser', function(req,res_body){
         path: path,
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
-    }
+    };
     var body = "";
     var json_res = {};
     var req = https.request(options, function(res) {
-        console.log('HTTP GET RESPONSE: ' + res.statusCode);
+        console.log('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
             process.stdout.write(d);

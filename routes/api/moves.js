@@ -13,7 +13,7 @@ var docClient = new AWS.DynamoDB.DocumentClient();
 
 
 router.get('/test', function(req,res){
-    res.send('user working');
+    res.send('moves working');
 });
 
 router.post('/updateMoves', function(req,res_body){
@@ -61,7 +61,7 @@ router.post('/updateMoves', function(req,res_body){
     var body = "";
     var json_res = {};
     var req = https.request(options, function(res) {
-        console.log('HTTP GET RESPONSE: ' + res.statusCode);
+        console.log('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
             process.stdout.write(d);

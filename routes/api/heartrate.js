@@ -60,7 +60,7 @@ router.post('/updateHeartRates', function(req,res_body){
     var body = "";
     var json_res = {};
     var req = https.request(options, function(res) {
-        console.log('HTTP GET RESPONSE: ' + res.statusCode);
+        console.log('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
             process.stdout.write(d);

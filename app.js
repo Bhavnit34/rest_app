@@ -4,8 +4,18 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
+var expressWinston = require('express-winston');
+var winston = require('winston');
 
 var app = express();
+
+var fs = require('fs');
+// set up logger
+var logPath = __dirname + "/logs/";
+// create the log directory if it doesn't exist
+if (!fs.existsSync(logPath)){
+    fs.mkdirSync(logPath);
+}
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -18,6 +28,25 @@ app.use(bodyParser.json());
 app.use(logger('dev'));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+
+// express-winston logger makes sense BEFORE the router.
+app.use(expressWinston.logger({
+    transports: [
+        new winston.transports.Console({
+            json: true,
+            colorize: true
+        }),
+        new (winston.transports.File)({
+            filename: logPath + "/rest_app.log"
+        })
+    ],
+    exitOnError: false,
+    colorize: true,
+    requestWhitelist: ["url", "method", "originalURL"]
+}));
+
+
 
 // Routes
 app.use('/', require('./routes/index'));
@@ -47,5 +76,19 @@ app.use(function(err, req, res, next) {
   res.status(err.status || 500);
   res.render('error');
 });
+
+// express-winston errorLogger makes sense AFTER the router.
+app.use(expressWinston.errorLogger({
+    transports: [
+        new winston.transports.Console({
+            json: true,
+            colorize: true
+        }),
+        new (winston.transports.File)({
+            filename: logPath + "/rest_app.log"
+        })
+    ],
+    exitOnError: false
+}));
 
 module.exports = app;

@@ -1,3 +1,4 @@
+// Module to construct a winston logger for any module that requires it.
 var winston = require('winston');
 var fs = require('fs');
 // set up logger
@@ -7,7 +8,7 @@ if (!fs.existsSync(logPath)){
     fs.mkdirSync(logPath);
 }
 
-var logger = new (winston.Logger)({
+var winstonLogger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({
             "timestamp":true,
@@ -16,9 +17,10 @@ var logger = new (winston.Logger)({
         new (winston.transports.File)({
             filename: logPath + "/rest_app.log"
         })
-    ]
+    ],
+    exitOnError: false
 });
 
 module.exports = {
-    getLogger : function() { return logger;}
+    getLogger : function() { return winstonLogger;}
 };

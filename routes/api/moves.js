@@ -13,9 +13,10 @@ AWS.config.update({
 var docClient = new AWS.DynamoDB.DocumentClient();
 var logger = loggerModule.getLogger();
 
+
 router.get('/test', function(req,res){
     res.send('moves working');
-    logger.info("logger working");
+    logger.info("new logger working");
 });
 
 router.post('/updateMoves', function(req,res_body){

@@ -1,21 +1,18 @@
 // Module to construct a winston logger for any module that requires it.
 var winston = require('winston');
 var fs = require('fs');
-// set up logger
-var logPath = __dirname + "/../logs/";
-// create the log directory if it doesn't exist
-if (!fs.existsSync(logPath)){
-    fs.mkdirSync(logPath);
-}
+var args = require('../args');
 
 var winstonLogger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)({
             "timestamp":true,
-            "colorize": true
+            "colorize": true,
+            "level" : args.logLevel
         }),
         new (winston.transports.File)({
-            filename: logPath + "/rest_app.log"
+            filename: args.logPath + "/rest_app.log",
+            level : args.logLevel
         })
     ],
     exitOnError: false

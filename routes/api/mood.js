@@ -3,6 +3,7 @@ var express = require('express');
 var router = express.Router();
 var https = require('https');
 var api = require('./api');
+var loggerModule = require('../logger');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
@@ -10,10 +11,11 @@ AWS.config.update({
     endpoint: "https://dynamodb.eu-west-1.amazonaws.com"
 });
 var docClient = new AWS.DynamoDB.DocumentClient();
-
+var logger = loggerModule.getLogger();
 
 router.get('/test', function(req,res){
     res.send('mood working');
+    logger.info("logger working");
 });
 
 router.post('/updateMood', function(req,res_body){
@@ -49,7 +51,7 @@ router.post('/updateMood', function(req,res_body){
     var body = "";
     var json_res = {};
     var req = https.request(options, function(res) {
-        console.log('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
+        logger.debug('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
             process.stdout.write(d);
@@ -77,7 +79,7 @@ router.post('/updateMood', function(req,res_body){
         });
 
         req.on('error', function(e) {
-            console.error(e);
+            logger.error(e);
             returnJson.Jawbone.message = e.message;
             returnJson.Jawbone.error = true;
             return res_body.status(500).send(returnJson);
@@ -103,15 +105,15 @@ router.post('/updateMood', function(req,res_body){
         };
 
         // update table
-        console.log("Adding mood " +  date + " for user " + user_id);
+        logger.info("Adding mood " +  date + " for user " + user_id);
         docClient.put(params, function (err, data) {
             if (err) {
-                console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
                 returnJson.DynamoDB.message = JSON.stringify(err, null, 2);
                 returnJson.DynamoDB.error = true;
                 return res_body.status(500).send(returnJson);
             } else {
-                console.log("item added");
+                logger.info("item added");
                 returnJson.DynamoDB.message = "SUCCESS";
                 returnJson.DynamoDB.error = false;
                 return res_body.status(200).send(returnJson);

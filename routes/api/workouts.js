@@ -3,17 +3,19 @@ var express = require('express');
 var router = express.Router();
 var https = require('https');
 var api = require('./api');
+var loggerModule = require('../logger');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
     region: "eu-west-1",
     endpoint: "https://dynamodb.eu-west-1.amazonaws.com"
 });
-var docClient = new AWS.DynamoDB.DocumentClient();
-
+var docClient = new AWS.DynamoDB.DocumentClient()
+var logger = loggerModule.getLogger();
 
 router.get('/test', function(req,res){
     res.send('workouts working');
+    logger.info("logger working");
 });
 
 router.post('/updateWorkouts', function(req,res_body){
@@ -60,7 +62,7 @@ router.post('/updateWorkouts', function(req,res_body){
     var body = "";
     var json_res = {};
     var req = https.request(options, function(res) {
-        console.log('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
+        logger.debug('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
             process.stdout.write(d);
@@ -86,7 +88,7 @@ router.post('/updateWorkouts', function(req,res_body){
 
         });
         req.on('error', function(e) {
-            console.error(e);
+            logger.error(e);
             returnJson.Jawbone.message = e.message;
             returnJson.Jawbone.error = true;
             return res_body.status(500).send(returnJson);
@@ -107,12 +109,12 @@ router.post('/updateWorkouts', function(req,res_body){
             // handle when all items have been completed, set appropriate return values
             if (i >= json_res.data.size) {
                 if (successCount == json_res.data.size) {
-                    console.log("All items added!");
+                    logger.info("All items added!");
                     returnJson.DynamoDB.message = "SUCCESS";
                     returnJson.DynamoDB.error = false;
                     return res_body.status(200).send(returnJson);
                 } else {
-                    console.error(successCount + "/" + json_res.data.size + " items updated.");
+                    logger.error(successCount + "/" + json_res.data.size + " items updated.");
                     returnJson.DynamoDB.message = successCount + "/" + json_res.data.size + " items updated. See logs.";
                     returnJson.DynamoDB.error = true;
                     return res_body.status(500).send(returnJson);
@@ -133,10 +135,10 @@ router.post('/updateWorkouts', function(req,res_body){
             };
 
             // update table
-            console.log("Adding workout " + i + " --> " + date + " for user " + user_id);
+            logger.info("Adding workout " + i + " --> " + date + " for user " + user_id);
             docClient.put(params, function (err, data) {
                 if (err) {
-                    console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                    logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
                     returnJson.DynamoDB[json_res.data.items[i].date.toString()] = JSON.stringify(err, null, 2);
                 } else {
                     ++successCount;

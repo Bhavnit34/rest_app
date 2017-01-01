@@ -12,6 +12,7 @@ var winstonLogger = new (winston.Logger)({
         }),
         new (winston.transports.File)({
             filename: args.logPath + "/rest_app.log",
+            colorize: true,
             level : args.logLevel
         })
     ],

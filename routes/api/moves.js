@@ -124,26 +124,34 @@ router.post('/updateMoves', function(req,res_body){
 
             // set unique table parameters
             var date = json_res.data.items[i].date.toString();
+            var formattedDate = date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2);
             var params = {
                 TableName: table,
                 Item: {
                     "user_id": user_id,
                     "timestamp_completed": json_res.data.items[i].time_completed,
-                    "date": date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
+                    "date": formattedDate,
                     "info": json_res.data.items[i]
                 }
             };
 
-            // update table
-            logger.info("Adding moves " + (i+1) + " --> " +  date + " for user " + user_id);
-            docClient.put(params, function (err, data) {
-                if (err) {
-                    logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
-                } else {
-                    ++successCount;
-                }
-                updateDB(i+1);
-            });
+            var updateCallback = function (){
+                // update table
+                logger.info("Adding moves " + (i+1) + " --> " +  date + " for user " + user_id);
+                docClient.put(params, function (err, data) {
+                    if (err) {
+                        logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                    } else {
+                        ++successCount;
+                    }
+                    updateDB(i+1);
+                });
+            };
+
+
+            // delete any old data for the same day
+            deleteOldData(table, formattedDate, user_id, updateCallback);
+
 
         }
 
@@ -154,5 +162,67 @@ router.post('/updateMoves', function(req,res_body){
 
 
 });
+
+// function to remove any old rows of a given day that are now out of date (given the update of new data)
+function deleteOldData(table, date, user_id, updateCallback) {
+    // query the table for current data on the given date
+    var params = {
+        TableName: table,
+        KeyConditionExpression: 'user_id = :user_id',
+        FilterExpression: '#mydate = :date',
+        ExpressionAttributeValues: {
+            ':user_id': user_id,
+            ':date': date
+        },
+        ExpressionAttributeNames: {
+            "#mydate": "date"
+        }
+    };
+
+    docClient.query(params, function(err, data) {
+        if (err) {
+            logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+        } else {
+            var res = data;
+            if (res.Count <= 0) {return updateCallback();} // return if there is no data to delete
+            // now delete any data that exists for this day
+            function deleteData(i, nextDeleteCallback) {
+                var userId = res.Items[i].user_id;
+                var timestamp = res.Items[i].timestamp_completed;
+                var delParams = {
+                    TableName: table,
+                    Key: {
+                        "user_id": userId,
+                        "timestamp_completed": timestamp
+                    }
+                };
+                docClient.delete(delParams, function (err, data) {
+                    if (err) {
+                        logger.error("Unable to delete item. Error JSON:", JSON.stringify(err, null, 2))
+                    } else {
+                        logger.info("Deleted old data --> " + user_id + ", " + date);
+                        return nextDeleteCallback();
+                    }
+                })
+            }
+
+            var i = 0;
+            var nextDeleteCallback = function() {
+                i++;
+                if (i < res.Items.length) {
+                    deleteData(i, nextDeleteCallback);
+                } else {
+                    // we have deleted all of the data for this day, return
+                    return updateCallback();
+                }
+            };
+            deleteData(i, nextDeleteCallback);
+
+
+        }
+    })
+
+
+}
 
 module.exports = router;

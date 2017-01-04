@@ -200,7 +200,7 @@ function deleteOldData(table, date, user_id, updateCallback) {
                     if (err) {
                         logger.error("Unable to delete item. Error JSON:", JSON.stringify(err, null, 2))
                     } else {
-                        logger.info("Deleted old data --> " + user_id + ", " + date);
+                        logger.debug("Deleted old data --> " + user_id + ", " + date);
                         return nextDeleteCallback();
                     }
                 })

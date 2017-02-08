@@ -1,3 +1,14 @@
+// Dependencies
+var sha1 = require("sha1");
+var loggerModule = require('../logger');
+// AWS dependencies
+var AWS = require("aws-sdk");
+AWS.config.update({
+    region: "eu-west-1",
+    endpoint: "https://dynamodb.eu-west-1.amazonaws.com"
+});
+var docClient = new AWS.DynamoDB.DocumentClient();
+var logger = loggerModule.getLogger();
 module.exports = {
 
     // change empty strings within json data.items to null as db doesn't allow it
@@ -40,6 +51,32 @@ module.exports = {
                 }
             };
         return json;
+    },
+
+    authenticateToken: function(token, user_id, callback_proceed) {
+        var hashedToken = sha1(token);
+        // Retrieve data from db
+        var params = {
+            TableName: "User",
+            KeyConditionExpression: 'user_id = :user_id',
+            ExpressionAttributeValues: {
+                ':user_id': user_id
+            },
+            Limit: 1
+        };
+
+        docClient.query(params, function(err, data) {
+            if (err) {
+                logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                if (data.Items[0].token_hash == hashedToken){
+                    return callback_proceed(true);
+                } else {
+                    return callback_proceed(false);
+                }
+            }
+        });
+
     }
 };
 

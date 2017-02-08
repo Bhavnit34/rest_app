@@ -26,52 +26,67 @@ router.get('/:userId/', function(req,res){
     var returnJson = api.newReturnJson();
     var limit = 10;
 
+    // check for passed userID
+    if (!req.params.userId){
+        returnJson.DynamoDB.message = "User ID missing!";
+        returnJson.DynamoDB.error = true;
+        return res.status(400).send(returnJson);
+    } else {
+        user_id = req.params.userId;
+    }
+
     // authenticate token
     if (!req.query.token){
         returnJson.DynamoDB.message = "Token missing!";
         returnJson.DynamoDB.error = true;
         return res.status(401).send(returnJson);
-    }
-
-    // check for passed userID
-    if (!req.params.userId){
-        returnJson.DynamoDB.message = "User ID missing!";
-        returnJson.DynamoDB.error = true;
-        return res.status(401).send(returnJson);
     } else {
-        user_id = req.params.userId;
+        var token = req.query.token;
     }
 
+    // run this after authentication check below
+    var proceed = function(authenticated) {
 
-    // add limit to query if given
-    if (req.query.limit) {
-        if(!isNaN(req.query.limit)) {
-            limit =  parseInt(req.query.limit);
-        } else {
-            returnJson.DynamoDB.message = "Limit must be an integer";
+        if (authenticated == false) {
+            returnJson.DynamoDB.message = "Authenication Failed";
             returnJson.DynamoDB.error = true;
-            return res.status(400).send(returnJson);
+            return res.status(401).send(returnJson);
         }
-    }
 
-    // Retrieve data from db
-    var params = {
-        TableName: table,
-        KeyConditionExpression: 'user_id = :user_id',
-        ExpressionAttributeValues: {
-            ':user_id': user_id
-        },
-        Limit: limit
+
+        // add limit to query if given
+        if (req.query.limit) {
+            if (!isNaN(req.query.limit)) {
+                limit = parseInt(req.query.limit);
+            } else {
+                returnJson.DynamoDB.message = "Limit must be an integer";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+        }
+
+        // Retrieve data from db
+        var params = {
+            TableName: table,
+            KeyConditionExpression: 'user_id = :user_id',
+            ExpressionAttributeValues: {
+                ':user_id': user_id
+            },
+            Limit: limit
+        };
+
+        docClient.query(params, function (err, data) {
+            if (err) {
+                console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
+                res.send(JSON.stringify(data, null, 2));
+            }
+        });
     };
 
-    docClient.query(params, function(err, data) {
-        if (err) {
-            console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
-        } else {
-            //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
-            res.send(JSON.stringify(data, null, 2));
-        }
-    });
+    // continue only if token is authenticated
+    api.authenticateToken(token, user_id, proceed);
 
 });
 

@@ -4,6 +4,7 @@ var router = express.Router();
 var https = require('https');
 var api = require('./api');
 var loggerModule = require('../logger');
+var sha1 = require('sha1');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
@@ -23,12 +24,13 @@ router.post('/addUser', function(req,res_body){
     // make a jawbone REST request for user info
     var path = '/nudge/api/v.1.1/users/@me';
     var returnJson = api.newReturnJson();
-
     // authenticate token
     if (!req.body.token){
         returnJson.Jawbone.message = "Token missing!";
         returnJson.Jawbone.error = true;
         return res_body.status(401).send(returnJson);
+    } else {
+       var token = req.body.token;
     }
 
 
@@ -54,6 +56,7 @@ router.post('/addUser', function(req,res_body){
                 returnJson.Jawbone.error = true;
                 return res_body.status(res.statusCode).send(returnJson);
             } else {
+                json_res = JSON.parse(body);
                 returnJson.Jawbone.message = "SUCCESS";
                 returnJson.Jawbone.error = false;
                 loadUserInfo();
@@ -80,7 +83,8 @@ router.post('/addUser', function(req,res_body){
             TableName: table,
             Item: {
                 "user_id": user_id,
-                "info": json_res.data
+                "info": json_res.data,
+                "token_hash": sha1(token) // hash token using SHA-1
             }
         };
 

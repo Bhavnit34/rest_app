@@ -84,15 +84,13 @@ router.get('/:userId/', function(req,res){
         // add endDate to query if given
         var endDate = null;
         if (req.query.endDate) {
-            if(startDate == null){
-                returnJson.DynamoDB.message = "please specify startDate when using endDate";
-                returnJson.DynamoDB.error = true;
-                return res.status(400).send(returnJson);
-            }
             if (!isNaN(Date.parse(req.query.endDate))) {
+                // get the end of this day by getting the next day and minusing 1 off the UNIX timestamp
                 endDate = req.query.endDate;
-                var endStamp = new Date(endDate).getTime().toString().substr(0, 10);
-                attrValues[':endStamp'] = parseInt(endStamp);
+                var nextDate =  new Date(endDate);
+                nextDate.setDate(nextDate.getDate() + 1);
+                var endStamp = new Date(nextDate).getTime().toString().substr(0, 10);
+                attrValues[':endStamp'] = parseInt(endStamp) - 1;
             } else {
                 returnJson.DynamoDB.message = "Invalid endDate";
                 returnJson.DynamoDB.error = true;
@@ -104,10 +102,17 @@ router.get('/:userId/', function(req,res){
         // create query and append attributes if requested
         var query = "user_id = :user_id";
         attrValues[':user_id'] = user_id;
-        if (endDate) {
-            query += " AND timestamp_completed BETWEEN :startStamp AND :endStamp";
+        if (startDate && endDate) {
+            if(attrValues[':startStamp'] > attrValues[':endStamp']) {
+                returnJson.DynamoDB.message = "endDate is before startDate!";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+            query += " AND timestamp_completed BETWEEN :startStamp AND :endStamp"; //results between dates
         } else if (startDate) {
-            query += " AND timestamp_completed >= :startStamp";
+            query += " AND timestamp_completed >= :startStamp"; // show dates going forwards from startDate
+        } else if (endDate) {
+            query += " AND timestamp_completed <= :endStamp"; // show dates going backwards from endDate
         }
 
         // Retrieve data from db

@@ -25,6 +25,7 @@ router.get('/:userId/', function(req,res){
     var user_id = "";
     var returnJson = api.newReturnJson();
     var limit = 10;
+    var attrValues = {};
 
     // check for passed userID
     if (!req.params.userId){
@@ -65,15 +66,58 @@ router.get('/:userId/', function(req,res){
             }
         }
 
+
+        // add startDate to query if given
+        var startDate = null;
+        if (req.query.startDate) {
+            if (!isNaN(Date.parse(req.query.startDate))) {
+                startDate = req.query.startDate;
+                var startStamp = new Date(startDate).getTime().toString().substr(0,10);
+                attrValues[':startStamp'] = parseInt(startStamp);
+            } else {
+                returnJson.DynamoDB.message = "Invalid startDate";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+        }
+
+        // add endDate to query if given
+        var endDate = null;
+        if (req.query.endDate) {
+            if(startDate == null){
+                returnJson.DynamoDB.message = "please specify startDate when using endDate";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+            if (!isNaN(Date.parse(req.query.endDate))) {
+                endDate = req.query.endDate;
+                var endStamp = new Date(endDate).getTime().toString().substr(0, 10);
+                attrValues[':endStamp'] = parseInt(endStamp);
+            } else {
+                returnJson.DynamoDB.message = "Invalid endDate";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+        }
+
+
+        // create query and append attributes if requested
+        var query = "user_id = :user_id";
+        attrValues[':user_id'] = user_id;
+        if (endDate) {
+            query += " AND timestamp_completed BETWEEN :startStamp AND :endStamp";
+        } else if (startDate) {
+            query += " AND timestamp_completed >= :startStamp";
+        }
+
         // Retrieve data from db
         var params = {
             TableName: table,
-            KeyConditionExpression: 'user_id = :user_id',
-            ExpressionAttributeValues: {
-                ':user_id': user_id
-            },
+            KeyConditionExpression: query,
+            ExpressionAttributeValues: attrValues,
             Limit: limit
         };
+
 
         docClient.query(params, function (err, data) {
             if (err) {

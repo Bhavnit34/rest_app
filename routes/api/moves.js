@@ -19,7 +19,7 @@ router.get('/test', function(req,res){
     logger.info("new logger working");
 });
 
-// function to return all moves
+// function to return stored moves data
 router.get('/:userId/', function(req,res){
     var table = "Moves";
     var user_id = "";

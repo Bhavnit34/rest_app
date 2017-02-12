@@ -18,6 +18,66 @@ router.get('/test', function(req,res){
     logger.info("logger working");
 });
 
+// function to return stored settings data
+router.get('/:userId/', function(req,res){
+    var table = "Settings";
+    var user_id = "";
+    var returnJson = api.newReturnJson();
+    var attrValues = {};
+
+    // check for passed userID
+    if (!req.params.userId){
+        returnJson.DynamoDB.message = "User ID missing!";
+        returnJson.DynamoDB.error = true;
+        return res.status(400).send(returnJson);
+    } else {
+        user_id = req.params.userId;
+    }
+
+    // authenticate token
+    if (!req.query.token){
+        returnJson.DynamoDB.message = "Token missing!";
+        returnJson.DynamoDB.error = true;
+        return res.status(401).send(returnJson);
+    } else {
+        var token = req.query.token;
+    }
+
+    // run this after authentication check below
+    var proceed = function(authenticated) {
+
+        if (authenticated == false) {
+            returnJson.DynamoDB.message = "Authenication Failed";
+            returnJson.DynamoDB.error = true;
+            return res.status(401).send(returnJson);
+        }
+
+        // create query and append attributes if requested
+        var query = "user_id = :user_id";
+        attrValues[':user_id'] = user_id;
+
+        // Retrieve data from db
+        var params = {
+            TableName: table,
+            KeyConditionExpression: query,
+            ExpressionAttributeValues: attrValues
+        };
+
+        docClient.query(params, function (err, data) {
+            if (err) {
+                console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                res.send(JSON.stringify(data, null, 2));
+            }
+        });
+    };
+
+    // continue only if token is authenticated
+    api.authenticateToken(token, user_id, proceed);
+
+});
+
+// function to gather the latest data from Jawbone and push to DynamoDB
 router.post('/updateSettings', function(req,res_body){
     // make a jawbone REST request for settings info
     var path = '/nudge/api/v.1.1/users/@me/workouts?';

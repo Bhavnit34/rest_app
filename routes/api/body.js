@@ -18,6 +18,130 @@ router.get('/test', function(req,res){
     logger.info("logger working");
 });
 
+// function to return stored body data
+router.get('/:userId/', function(req, res) {
+    var table = "Body";
+    var user_id = "";
+    var returnJson = api.newReturnJson();
+    var limit = 10;
+    var attrValues = {};
+
+    // check for passed userID
+    if (!req.params.userId){
+        returnJson.DynamoDB.message = "User ID missing!";
+        returnJson.DynamoDB.error = true;
+        return res.status(400).send(returnJson);
+    } else {
+        user_id = req.params.userId;
+    }
+
+    // authenticate token
+    if (!req.query.token){
+        returnJson.DynamoDB.message = "Token missing!";
+        returnJson.DynamoDB.error = true;
+        return res.status(401).send(returnJson);
+    } else {
+        var token = req.query.token;
+    }
+
+    // run this after authentication check below
+    var proceed = function(authenticated) {
+
+        if (authenticated == false) {
+            returnJson.DynamoDB.message = "Authenication Failed";
+            returnJson.DynamoDB.error = true;
+            return res.status(401).send(returnJson);
+        }
+
+
+        // add limit to query if given
+        if (req.query.limit) {
+            if (!isNaN(req.query.limit)) {
+                limit = parseInt(req.query.limit);
+            } else {
+                returnJson.DynamoDB.message = "Limit must be an integer";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+        }
+
+
+        // add startDate to query if given
+        var startDate = null;
+        if (req.query.startDate) {
+            if (!isNaN(Date.parse(req.query.startDate))) {
+                startDate = req.query.startDate;
+                var startStamp = new Date(startDate).getTime().toString().substr(0,10);
+                attrValues[':startStamp'] = parseInt(startStamp);
+            } else {
+                returnJson.DynamoDB.message = "Invalid startDate";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+        }
+
+        // add endDate to query if given
+        var endDate = null;
+        if (req.query.endDate) {
+            if (!isNaN(Date.parse(req.query.endDate))) {
+                // get the end of this day by getting the next day and minusing 1 off the UNIX timestamp
+                endDate = req.query.endDate;
+                var nextDate =  new Date(endDate);
+                nextDate.setDate(nextDate.getDate() + 1);
+                var endStamp = new Date(nextDate).getTime().toString().substr(0, 10);
+                attrValues[':endStamp'] = parseInt(endStamp) - 1;
+            } else {
+                returnJson.DynamoDB.message = "Invalid endDate";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+        }
+
+
+        // create query and append attributes if requested
+        var query = "user_id = :user_id";
+        attrValues[':user_id'] = user_id;
+        if (startDate && endDate) {
+            if(attrValues[':startStamp'] > attrValues[':endStamp']) {
+                returnJson.DynamoDB.message = "endDate is before startDate!";
+                returnJson.DynamoDB.error = true;
+                return res.status(400).send(returnJson);
+            }
+            query += " AND #timestamp BETWEEN :startStamp AND :endStamp"; //results between dates
+        } else if (startDate) {
+            query += " AND #timestamp >= :startStamp"; // show dates going forwards from startDate
+        } else if (endDate) {
+            query += " AND #timestamp <= :endStamp"; // show dates going backwards from endDate
+        }
+
+        // Retrieve data from db
+        var params = {
+            TableName: table,
+            KeyConditionExpression: query,
+            ExpressionAttributeValues: attrValues,
+            Limit: limit,
+            ExpressionAttributeNames: {
+                "#timestamp": "timestamp"
+            }
+        };
+
+
+        docClient.query(params, function (err, data) {
+            if (err) {
+                console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
+                res.send(JSON.stringify(data, null, 2));
+            }
+        });
+    };
+
+    // continue only if token is authenticated
+    api.authenticateToken(token, user_id, proceed);
+
+});
+
+// function to gather the latest data from Jawbone and push to DynamoDB
 router.post('/updateBodyEvents', function(req,res_body){
     // make a jawbone REST request for body_events info
     var path = '/nudge/api/v.1.1/users/@me/body_events?';

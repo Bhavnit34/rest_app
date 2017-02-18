@@ -47,3 +47,5 @@ router.post('/new-message', function(req,res_body) {
 
 
 });
+
+module.exports = router;

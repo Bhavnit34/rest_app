@@ -3,24 +3,24 @@ var express = require('express');
 var router = express.Router();
 var https = require('https');
 var api = require('./api');
-var loggerModule = require('../logger');
+var loggerModule = require('../../logger');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
     region: "eu-west-1",
     endpoint: "https://dynamodb.eu-west-1.amazonaws.com"
 });
-var docClient = new AWS.DynamoDB.DocumentClient();
+var docClient = new AWS.DynamoDB.DocumentClient()
 var logger = loggerModule.getLogger();
 
 router.get('/test', function(req,res){
-    res.send('heartrate working');
+    res.send('workouts working');
     logger.info("logger working");
 });
 
-// function to return stored heart rate data
-router.get('/:userId/', function(req, res) {
-    var table = "HeartRate";
+// function to return stored workout data
+router.get('/:userId/', function(req,res){
+    var table = "Workouts";
     var user_id = "";
     var returnJson = api.newReturnJson();
     var limit = 10;
@@ -107,11 +107,11 @@ router.get('/:userId/', function(req, res) {
                 returnJson.DynamoDB.error = true;
                 return res.status(400).send(returnJson);
             }
-            query += " AND #timestamp BETWEEN :startStamp AND :endStamp"; //results between dates
+            query += " AND timestamp_completed BETWEEN :startStamp AND :endStamp"; //results between dates
         } else if (startDate) {
-            query += " AND #timestamp >= :startStamp"; // show dates going forwards from startDate
+            query += " AND timestamp_completed >= :startStamp"; // show dates going forwards from startDate
         } else if (endDate) {
-            query += " AND #timestamp <= :endStamp"; // show dates going backwards from endDate
+            query += " AND timestamp_completed <= :endStamp"; // show dates going backwards from endDate
         }
 
         // Retrieve data from db
@@ -119,10 +119,7 @@ router.get('/:userId/', function(req, res) {
             TableName: table,
             KeyConditionExpression: query,
             ExpressionAttributeValues: attrValues,
-            Limit: limit,
-            ExpressionAttributeNames: {
-                "#timestamp": "timestamp"
-            }
+            Limit: limit
         };
 
 
@@ -141,11 +138,10 @@ router.get('/:userId/', function(req, res) {
 
 });
 
-
 // function to gather the latest data from Jawbone and push to DynamoDB
-router.post('/updateHeartRates', function(req,res_body){
-    // make a jawbone REST request for heart rate info
-    var path = '/nudge/api/v.1.1/users/@me/heartrates?';
+router.post('/updateWorkouts', function(req,res_body){
+    // make a jawbone REST request for workouts info
+    var path = '/nudge/api/v.1.1/users/@me/workouts?';
     var returnJson = api.newReturnJson();
 
     // authenticate token
@@ -202,9 +198,13 @@ router.post('/updateHeartRates', function(req,res_body){
                 return res_body.status(res.statusCode).send(returnJson);
             } else {
                 // REST response OK, proceed to DB update
+                json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
+                for (var i = 0; i < json_res.data.size; i++) {
+                    api.clearEmptyDataStrings(json_res.data.items[i].details);
+                }
                 returnJson.Jawbone.message = "SUCCESS";
                 returnJson.Jawbone.error = false;
-                putHeartRates();
+                putWorkouts();
             }
 
         });
@@ -218,9 +218,9 @@ router.post('/updateHeartRates', function(req,res_body){
     req.end();
 
 
-    // Load moves info into db
-    var putHeartRates = function () {
-        var table = "HeartRate";
+    // Load workouts info into db
+    var putWorkouts = function () {
+        var table = "Workouts";
         var user_id = json_res.meta.user_xid;
         var successCount = 0;
 
@@ -240,6 +240,7 @@ router.post('/updateHeartRates', function(req,res_body){
                     returnJson.DynamoDB.error = true;
                     return res_body.status(500).send(returnJson);
                 }
+
             }
 
             // set unique table parameters
@@ -248,26 +249,28 @@ router.post('/updateHeartRates', function(req,res_body){
                 TableName: table,
                 Item: {
                     "user_id": user_id,
-                    "timestamp": json_res.data.items[i].time_created,
+                    "timestamp_completed": json_res.data.items[i].time_completed,
                     "date": date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2),
-                    "heartrate": json_res.data.items[i].resting_heartrate
+                    "info": json_res.data.items[i]
                 }
             };
 
             // update table
-            logger.info("Adding heart rate " + (i + 1) + " --> " + date + " for user " + user_id);
+            logger.info("Adding workout " + i + " --> " + date + " for user " + user_id);
             docClient.put(params, function (err, data) {
                 if (err) {
                     logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                    returnJson.DynamoDB[json_res.data.items[i].date.toString()] = JSON.stringify(err, null, 2);
                 } else {
                     ++successCount;
                 }
-                updateDB(i + 1);
-            });
+                updateDB(i + 1); //update table for next index
+            })
 
         }
         // start at the first index, the function will iterate over all indexes synchronously until complete and return.
         updateDB(0);
+
     }
 
 });

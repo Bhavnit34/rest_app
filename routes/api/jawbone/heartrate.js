@@ -3,7 +3,7 @@ var express = require('express');
 var router = express.Router();
 var https = require('https');
 var api = require('./api');
-var loggerModule = require('../logger');
+var loggerModule = require('../../logger');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
@@ -14,13 +14,13 @@ var docClient = new AWS.DynamoDB.DocumentClient();
 var logger = loggerModule.getLogger();
 
 router.get('/test', function(req,res){
-    res.send('body working');
+    res.send('heartrate working');
     logger.info("logger working");
 });
 
-// function to return stored body data
+// function to return stored heart rate data
 router.get('/:userId/', function(req, res) {
-    var table = "Body";
+    var table = "HeartRate";
     var user_id = "";
     var returnJson = api.newReturnJson();
     var limit = 10;
@@ -141,12 +141,12 @@ router.get('/:userId/', function(req, res) {
 
 });
 
-// function to gather the latest data from Jawbone and push to DynamoDB
-router.post('/updateBodyEvents', function(req,res_body){
-    // make a jawbone REST request for body_events info
-    var path = '/nudge/api/v.1.1/users/@me/body_events?';
-    var returnJson = api.newReturnJson();
 
+// function to gather the latest data from Jawbone and push to DynamoDB
+router.post('/updateHeartRates', function(req,res_body){
+    // make a jawbone REST request for heart rate info
+    var path = '/nudge/api/v.1.1/users/@me/heartrates?';
+    var returnJson = api.newReturnJson();
 
     // authenticate token
     if (!req.body.token){
@@ -201,10 +201,10 @@ router.post('/updateBodyEvents', function(req,res_body){
                 returnJson.Jawbone.error = true;
                 return res_body.status(res.statusCode).send(returnJson);
             } else {
-                json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
+                // REST response OK, proceed to DB update
                 returnJson.Jawbone.message = "SUCCESS";
                 returnJson.Jawbone.error = false;
-                putBodyEvents();
+                putHeartRates();
             }
 
         });
@@ -218,9 +218,9 @@ router.post('/updateBodyEvents', function(req,res_body){
     req.end();
 
 
-    // Load user info into db
-    var putBodyEvents = function () {
-        var table = "Body";
+    // Load moves info into db
+    var putHeartRates = function () {
+        var table = "HeartRate";
         var user_id = json_res.meta.user_xid;
         var successCount = 0;
 
@@ -249,27 +249,25 @@ router.post('/updateBodyEvents', function(req,res_body){
                 Item: {
                     "user_id": user_id,
                     "timestamp": json_res.data.items[i].time_created,
-                    "date": date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
-                    "info": json_res.data.items[i]
+                    "date": date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2),
+                    "heartrate": json_res.data.items[i].resting_heartrate
                 }
             };
 
             // update table
-            logger.info("Adding body_event " + (i+1) + " --> " +  date + " for user " + user_id);
+            logger.info("Adding heart rate " + (i + 1) + " --> " + date + " for user " + user_id);
             docClient.put(params, function (err, data) {
                 if (err) {
                     logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
-                    returnJson.DynamoDB[json_res.data.items[i].date.toString()] = JSON.stringify(err, null, 2);
                 } else {
                     ++successCount;
                 }
-                updateDB(i+1); // call update for next row
+                updateDB(i + 1);
             });
-        }
 
+        }
         // start at the first index, the function will iterate over all indexes synchronously until complete and return.
         updateDB(0);
-
     }
 
 });

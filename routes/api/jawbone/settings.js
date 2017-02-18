@@ -3,8 +3,7 @@ var express = require('express');
 var router = express.Router();
 var https = require('https');
 var api = require('./api');
-var loggerModule = require('../logger');
-var sha1 = require('sha1');
+var loggerModule = require('../../logger');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
@@ -14,15 +13,14 @@ AWS.config.update({
 var docClient = new AWS.DynamoDB.DocumentClient();
 var logger = loggerModule.getLogger();
 
-// routes
 router.get('/test', function(req,res){
-    res.send('user working');
+    res.send('settings working');
     logger.info("logger working");
 });
 
-// function to return stored user data
+// function to return stored settings data
 router.get('/:userId/', function(req,res){
-    var table = "User";
+    var table = "Settings";
     var user_id = "";
     var returnJson = api.newReturnJson();
     var attrValues = {};
@@ -80,19 +78,17 @@ router.get('/:userId/', function(req,res){
 });
 
 // function to gather the latest data from Jawbone and push to DynamoDB
-router.post('/addUser', function(req,res_body){
-    // make a jawbone REST request for user info
-    var path = '/nudge/api/v.1.1/users/@me';
+router.post('/updateSettings', function(req,res_body){
+    // make a jawbone REST request for settings info
+    var path = '/nudge/api/v.1.1/users/@me/workouts?';
     var returnJson = api.newReturnJson();
+
     // authenticate token
     if (!req.body.token){
         returnJson.Jawbone.message = "Token missing!";
         returnJson.Jawbone.error = true;
         return res_body.status(401).send(returnJson);
-    } else {
-       var token = req.body.token;
     }
-
 
     var options = {
         host: 'jawbone.com',
@@ -110,18 +106,21 @@ router.post('/addUser', function(req,res_body){
             body += d;
         });
         res.on('end', function() {
+            json_res = JSON.parse(body);
             if (res.statusCode != 200) {
                 // REST response BAD, output error
                 returnJson.Jawbone.message = JSON.stringify(json_res, null, 2);
                 returnJson.Jawbone.error = true;
                 return res_body.status(res.statusCode).send(returnJson);
             } else {
-                json_res = JSON.parse(body);
+                json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
+                for (var i = 0; i < json_res.data.size; i++) {
+                    api.clearEmptyDataStrings(json_res.data.items[i].details);
+                }
                 returnJson.Jawbone.message = "SUCCESS";
                 returnJson.Jawbone.error = false;
-                loadUserInfo();
+                putSettings();
             }
-
         });
         req.on('error', function(e) {
             logger.error(e);
@@ -133,23 +132,21 @@ router.post('/addUser', function(req,res_body){
     req.end();
 
 
+    // Load settings info into db
+    var putSettings = function () {
+        var table = "Settings";
+        var user_id = json_res.meta.user_xid;
 
-    // Load user info into db
-    var loadUserInfo = function () {
-        var table = "User";
-        var user_id = json_res.data.xid;
-        json_res.data.image = "none";
         var params = {
             TableName: table,
             Item: {
                 "user_id": user_id,
-                "info": json_res.data,
-                "token_hash": sha1(token) // hash token using SHA-1
+                "info": json_res.data
             }
         };
 
-
-        logger.info("Adding a new user: " + user_id);
+        // update table
+        logger.info("Adding settings for user " + user_id);
         docClient.put(params, function (err, data) {
             if (err) {
                 logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
@@ -157,17 +154,15 @@ router.post('/addUser', function(req,res_body){
                 returnJson.DynamoDB.error = true;
                 return res_body.status(500).send(returnJson);
             } else {
-                logger.info("Added user ---> :" + user_id);
+                logger.info("item added");
                 returnJson.DynamoDB.message = "SUCCESS";
                 returnJson.DynamoDB.error = false;
                 return res_body.status(200).send(returnJson);
             }
         });
+
     }
 
 });
 
-
-
-//return router
 module.exports = router;

@@ -1,6 +1,6 @@
 // Dependencies
 var sha1 = require("sha1");
-var loggerModule = require('../logger');
+var loggerModule = require('../../logger');
 // AWS dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({

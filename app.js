@@ -48,14 +48,15 @@ app.use(expressWinston.logger({
 
 // Routes
 app.use('/', require('./routes/index'));
-app.use('/api/user', require('./routes/api/user'));
-app.use('/api/body', require('./routes/api/body'));
-app.use('/api/moves', require('./routes/api/moves'));
-app.use('/api/heartrate', require('./routes/api/heartrate'));
-app.use('/api/settings', require('./routes/api/settings'));
-app.use('/api/mood', require('./routes/api/mood'));
-app.use('/api/sleeps', require('./routes/api/sleeps'));
-app.use('/api/workouts', require('./routes/api/workouts'));
+app.use('/api/user', require('./routes/api/jawbone/user'));
+app.use('/api/body', require('./routes/api/jawbone/body'));
+app.use('/api/moves', require('./routes/api/jawbone/moves'));
+app.use('/api/heartrate', require('./routes/api/jawbone/heartrate'));
+app.use('/api/settings', require('./routes/api/jawbone/settings'));
+app.use('/api/mood', require('./routes/api/jawbone/mood'));
+app.use('/api/sleeps', require('./routes/api/jawbone/sleeps'));
+app.use('/api/workouts', require('./routes/api/jawbone/workouts'));
+app.use('/api/telegram', require('./routes/api/telegram/telegram'));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

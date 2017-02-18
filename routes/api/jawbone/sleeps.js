@@ -3,7 +3,7 @@ var express = require('express');
 var router = express.Router();
 var https = require('https');
 var api = require('./api');
-var loggerModule = require('../logger');
+var loggerModule = require('../../logger');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({

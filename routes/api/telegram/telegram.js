@@ -2,6 +2,7 @@
 var express = require('express');
 var router = express.Router();
 var https = require('https');
+var request = require('request');
 var loggerModule = require('../../logger');
 // AWS Dependencies
 var AWS = require('aws-sdk');
@@ -14,36 +15,25 @@ var logger = loggerModule.getLogger();
 var botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
 
 router.post('/new-message', function(req,res_body) {
-    var message = client_req.body;
+    const {message} = req.body;
 
     if (!message) {
         return res_body.status(400).send("");
     }
-
+    logger.info("chat_id: " + message.chat.id);
     // reply
-    var options = {
-        hostname: 'https://api.telegram.org/bot' + botAPI,
-        path: '/sendMessage',
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+    request({
+        url: 'https://api.telegram.org/bot' + botAPI + '/' + 'sendMessage',
+        method: "POST",
         json: {
-            "chat_id": message.chat_id,
+            "chat_id": message.chat.id,
             "text": "replied"
-        }
-    };
-
-    var client_req = https.request(options, function(res) {
-        console.log('Status: ' + res.statusCode);
-        console.log('Headers: ' + JSON.stringify(res.headers));
-        res.setEncoding('utf8');
-        res.on('data', function (body) {
-            console.log('Body: ' + body);
-        });
+        },
+        headers: { "content-type" : "application/json"}
+    }, function(err, res, body){
+        if(err) {logger.error('problem with request: ' + e.message);}
+        return res_body.status(res.statusCode).send(body);
     });
-    client_req.on('error', function(e) {
-        console.log('problem with request: ' + e.message);
-    });
-    client_req.end();
 
 
 });

@@ -16,17 +16,38 @@ var botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
 
 router.post('/new-message', function(req,res_body) {
     const {message} = req.body;
+    var json = req.body;
+    console.log(JSON.stringify(json,null, 2));
+    var callbackID = json.callback_query.id;
+
+
 
     if (!message) {
-        return res_body.status(400).send("");
+        // return res_body.status(400).send("");
+    } else {
+        console.log(JSON.stringify(message));
     }
-    logger.info("chat_id: " + message.chat.id);
-    // reply
+
+
+    request({
+        url: 'https://api.telegram.org/bot' + botAPI + '/' + 'answerCallbackQuery',
+        method: "POST",
+        json: {
+            "callback_query_id": callbackID,
+            "text" : "success"
+        },
+        headers: { "content-type" : "application/json"}
+    }, function(err, res, body){
+        if(err) {logger.error('problem with request: ' + e.message);}
+        console.log("answered successfully");
+    });
+
+    /* reply
     request({
         url: 'https://api.telegram.org/bot' + botAPI + '/' + 'sendMessage',
         method: "POST",
         json: {
-            "chat_id": message.chat.id,
+            "chat_id": json.callback_query.message.chat.id,
             "text": "replied"
         },
         headers: { "content-type" : "application/json"}
@@ -34,7 +55,8 @@ router.post('/new-message', function(req,res_body) {
         if(err) {logger.error('problem with request: ' + e.message);}
         return res_body.status(res.statusCode).send(body);
     });
-
+    */
+    
 
 });
 

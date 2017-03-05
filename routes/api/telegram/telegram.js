@@ -1,24 +1,24 @@
 // Dependencies
-var express = require('express');
-var router = express.Router();
-var https = require('https');
-var request = require('request');
-var loggerModule = require('../../logger');
+let express = require('express');
+let router = express.Router();
+let https = require('https');
+let request = require('request');
+let loggerModule = require('../../logger');
 // AWS Dependencies
-var AWS = require('aws-sdk');
+let AWS = require('aws-sdk');
 AWS.config.update({
     region: "eu-west-1",
     endpoint: "https://dynamodb.eu-west-1.amazonaws.com"
 });
-var docClient = new AWS.DynamoDB.DocumentClient();
-var logger = loggerModule.getLogger();
-var botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
+const docClient = new AWS.DynamoDB.DocumentClient();
+const logger = loggerModule.getLogger();
+const botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
 
 router.post('/new-message', function(req,res_body) {
     const {message} = req.body;
-    var json = req.body;
+    let json = req.body;
     console.log(JSON.stringify(json,null, 2));
-    var callbackID = json.callback_query.id;
+    let callbackID = json.callback_query.id;
 
 
 

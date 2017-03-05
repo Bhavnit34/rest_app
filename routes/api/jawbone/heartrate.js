@@ -119,11 +119,15 @@ router.get('/:userId/', function(req, res) {
             TableName: table,
             KeyConditionExpression: query,
             ExpressionAttributeValues: attrValues,
-            Limit: limit,
-            ExpressionAttributeNames: {
+            Limit: limit
+        };
+
+        if (startDate || endDate) {
+            params.ExpressionAttributeNames = {
                 "#timestamp": "timestamp"
             }
-        };
+        }
+
 
 
         docClient.query(params, function (err, data) {
@@ -218,7 +222,7 @@ router.post('/updateHeartRates', function(req,res_body){
     req.end();
 
 
-    // Load moves info into db
+    // Load HR info into db
     var putHeartRates = function () {
         var table = "HeartRate";
         var user_id = json_res.meta.user_xid;
@@ -268,7 +272,216 @@ router.post('/updateHeartRates', function(req,res_body){
         }
         // start at the first index, the function will iterate over all indexes synchronously until complete and return.
         updateDB(0);
+    };
+
+
+});
+
+
+
+
+// function to calculate the stats from the whole table, if these values were lost
+function calculateInitialStats(userID) {
+    let avg = 0;
+    let total = 0;
+    let min = 0;
+    let max = 0;
+    const table = "HeartRate";
+    const params = {
+        TableName: table,
+        KeyConditionExpression: "user_id = :user_id",
+        ExpressionAttributeValues: {":user_id" : userID}
+
+    };
+
+    docClient.query(params, function(err, data) {
+        if (err) {
+            logger.error("Unable to read HR item. Error JSON:", JSON.stringify(err, null, 2));
+        } else {
+            // proceed to calculating the stats
+            min = data.Items[0].heartrate;
+            max = data.Items[0].heartrate;
+            for(let i = 0; i < data.Items.length; i++) {
+
+
+                // loop through each row and cumliate the average
+                let hr = data.Items[i].heartrate;
+                if (hr != null) {
+                    total += hr;
+                    if (hr < min) {
+                        min = hr;
+                    } else if (hr > max) {
+                        max = hr;
+                    }
+                }
+            }
+            avg = Math.ceil(total / data.Items.length);
+            const avg_count = data.Items.length;
+            const timestamp_updated = Date.now().toString().substr(0,10);
+
+            let stats = {
+                avg: avg,
+                min: min,
+                max: max,
+                avg_count: avg_count,
+                timestamp_updated: timestamp_updated
+            };
+            return stats;
+        }
+
+    });
+}
+
+// function to update the stats table
+router.post('/updateStats', function(req, res) {
+    let user_id = "";
+    let returnJson = api.newReturnJson();
+    let token = "";
+    let stats = null;
+
+    // check userId
+    if (!req.body.userId){
+        returnJson.Jawbone.message = "Missing userId!";
+        returnJson.Jawbone.error = true;
+        return res_body.status(401).send(returnJson);
+    } else {
+        user_id = req.body.userId;
     }
+
+    // authenticate token
+    if (!req.body.token){
+        returnJson.Jawbone.message = "Token missing!";
+        returnJson.Jawbone.error = true;
+        return res_body.status(401).send(returnJson);
+    } else {
+        token = req.body.token;
+    }
+
+
+    // run this after authentication check below
+    let proceed = function(authenticated) {
+        let checkStats = function(callback) {
+            // read what we currently have in the stats table
+            const table = "Stats";
+            const params = {
+                TableName: table,
+                KeyConditionExpression: "user_id = :user_id",
+                ExpressionAttributeValues: {":user_id" : user_id}
+
+            };
+            docClient.query(params, function (err, data) {
+                if (err) {
+                    logger.error("Unable to read STATS HR item. Error JSON:", JSON.stringify(err, null, 2));
+                } else {
+                    const hr = data.Items[0].info.HeartRate;
+                    if (hr.avg == null || hr.min == null || hr.max == null || hr.avg_count == null) {
+                        // we need to restore the stats
+                        logger.info("HR Stats not in table. Updating...");
+                        stats = calculateInitialStats(user_id);
+                        logger.info("--------------\n" + JSON.stringify(stats, null, 2));
+                        return callback(stats);
+                    } else {
+
+                        // update the stats if there are new items in the DB since last update
+                        const params = {
+                            TableName: "HeartRate",
+                            KeyConditionExpression: "user_id = :user_id AND #timestamp > :timestamp",
+                            ExpressionAttributeValues: {
+                                ":user_id": user_id,
+                                ":timestamp": hr.timestamp_updated
+                            },
+                            ExpressionAttributeNames: {
+                                "#timestamp": "timestamp"
+                            }
+                        };
+
+                        docClient.query(params, function (err, data) {
+                            if (err) {
+                                logger.error("Unable to read HR item. Error JSON:", JSON.stringify(err, null, 2));
+                            } else {
+                                if(data.Count == 0) {return callback(null);} // don't write any stats if there are no updates
+                                // calculate new stats
+                                const row = data.Items;
+                                let total = 0;
+                                stats.max = hr.max;
+                                stats.min = hr.min;
+                                for (let i = 0; i < data.Items.length; i++) {
+                                    let heartrate = row[i].heartrate;
+
+                                    if (heartrate > hr.max) {
+                                        stats.max = heartrate;
+                                    } else if (heartrate < hr.min) {
+                                        stats.min = heartrate;
+                                    }
+                                    total += heartrate;
+
+                                }
+                                // calculate new average by adding on the new values and dividng by (total + no. of new values)
+                                stats.avg = Math.ceil(((hr.avg * hr.avg_count) + total) / (hr.avg_count + data.Items.length));
+                                stats.avg_count = hr.avg_count + data.Items.length;
+                                stats.timestamp_updated = Date.now().toString().substr(0, 10);
+                                return callback(stats);
+                            }
+                        });
+                    }
+                }
+            });
+        };
+
+        // function that will write in the stats decided by checkStats()
+        let writeStats = function(stats){
+            // end if there is nothing to update
+            if (stats == null) {
+                returnJson.DynamoDB.message = "Stats already up to date";
+                returnJson.DynamoDB.error = false;
+                return res.status(200).send(returnJson);
+            }
+
+            // otherwise update the Stats table
+            const params = {
+                TableName:"Stats",
+                Key:{"user_id": user_id},
+                UpdateExpression: "set info.HeartRate.avg = :avg," +
+                " info.HeartRate.min = :min," +
+                " info.HeartRate.max = :max," +
+                " info.HeartRate.avg_count = :avg_count," +
+                " info.HeartRate.timestamp_completed = :timestamp_completed",
+                ExpressionAttributeValues:{
+                    ":min": stats.min,
+                    ":max": stats.max,
+                    "avg_count": stats.avg_count,
+                    ":avg": stats.avg,
+                    ":timestamp_updated" : stats.timestamp_updated
+                },
+                ReturnValues:"UPDATED_NEW"
+
+            };
+
+            // update dynamo table
+            docClient.update(params, function(err, data) {
+                if (err) {
+                    logger.error("Error updating Stats HR table. Error JSON:", JSON.stringify(err, null, 2));
+                    returnJson.DynamoDB.message = JSON.stringify(err, null, 2);
+                    returnJson.DynamoDB.error = true;
+                    return res.status(401).send(returnJson);
+                } else {
+                    logger.info("Stats HR table updated!");
+                    returnJson.DynamoDB.message = JSON.stringify(data, null, 2);
+                    returnJson.DynamoDB.error = false;
+                    return res.status(200).send(returnJson);
+                }
+            });
+
+        };
+
+        // trigger function that will call writeStats once the stats have been decided
+        checkStats(writeStats);
+    };
+
+
+    // continue only if token is authenticated
+    api.authenticateToken(token, user_id, proceed);
+
 
 });
 

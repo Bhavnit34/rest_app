@@ -281,7 +281,7 @@ router.post('/updateHeartRates', function(req,res_body){
 
 
 // function to calculate the stats from the whole table, if these values were lost
-function calculateInitialStats(userID) {
+function calculateInitialStats(userID, callback) {
     let avg = 0;
     let total = 0;
     let min = 0;
@@ -326,7 +326,7 @@ function calculateInitialStats(userID) {
                 avg_count: avg_count,
                 timestamp_updated: timestamp_updated
             };
-            return stats;
+            return callback(stats);
         }
 
     });
@@ -377,9 +377,9 @@ router.post('/updateStats', function(req, res) {
                     if (hr.avg == null || hr.min == null || hr.max == null || hr.avg_count == null) {
                         // we need to restore the stats
                         logger.info("HR Stats not in table. Updating...");
-                        stats = calculateInitialStats(user_id);
-                        logger.info("--------------\n" + JSON.stringify(stats, null, 2));
-                        return callback(stats);
+                        stats = calculateInitialStats(user_id, function(res){
+                            return callback(res);
+                        });
                     } else {
 
                         // update the stats if there are new items in the DB since last update
@@ -441,17 +441,22 @@ router.post('/updateStats', function(req, res) {
             const params = {
                 TableName:"Stats",
                 Key:{"user_id": user_id},
-                UpdateExpression: "set info.HeartRate.avg = :avg," +
-                " info.HeartRate.min = :min," +
-                " info.HeartRate.max = :max," +
+                UpdateExpression: "set info.HeartRate.#avg = :avg," +
+                " info.HeartRate.#min = :min," +
+                " info.HeartRate.#max = :max," +
                 " info.HeartRate.avg_count = :avg_count," +
-                " info.HeartRate.timestamp_completed = :timestamp_completed",
+                " info.HeartRate.timestamp_updated = :timestamp_updated",
                 ExpressionAttributeValues:{
                     ":min": stats.min,
                     ":max": stats.max,
-                    "avg_count": stats.avg_count,
+                    ":avg_count": stats.avg_count,
                     ":avg": stats.avg,
-                    ":timestamp_updated" : stats.timestamp_updated
+                    ":timestamp_updated" : parseInt(stats.timestamp_updated)
+                },
+                ExpressionAttributeNames: {
+                    "#avg": "avg",
+                    "#min": "min",
+                    "#max": "max",
                 },
                 ReturnValues:"UPDATED_NEW"
 
@@ -463,7 +468,7 @@ router.post('/updateStats', function(req, res) {
                     logger.error("Error updating Stats HR table. Error JSON:", JSON.stringify(err, null, 2));
                     returnJson.DynamoDB.message = JSON.stringify(err, null, 2);
                     returnJson.DynamoDB.error = true;
-                    return res.status(401).send(returnJson);
+                    return res.status(400).send(returnJson);
                 } else {
                     logger.info("Stats HR table updated!");
                     returnJson.DynamoDB.message = JSON.stringify(data, null, 2);

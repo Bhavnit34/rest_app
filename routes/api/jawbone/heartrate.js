@@ -337,7 +337,7 @@ router.post('/updateStats', function(req, res) {
     let user_id = "";
     let returnJson = api.newReturnJson();
     let token = "";
-    let stats = null;
+    let stats = {};
 
     // check userId
     if (!req.body.userId){
@@ -357,9 +357,14 @@ router.post('/updateStats', function(req, res) {
         token = req.body.token;
     }
 
+    // continue only if token is authenticated
+    api.authenticateToken(token, user_id, function(authenticated) {
+        if(!authenticated) {
+            returnJson.Jawbone.message = "Authentication Failed!";
+            returnJson.Jawbone.error = true;
+            return res_body.status(401).send(returnJson);
+        }
 
-    // run this after authentication check below
-    let proceed = function(authenticated) {
         let checkStats = function(callback) {
             // read what we currently have in the stats table
             const table = "Stats";
@@ -373,7 +378,7 @@ router.post('/updateStats', function(req, res) {
                 if (err) {
                     logger.error("Unable to read STATS HR item. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
-                    const hr = data.Items[0].info.HeartRate;
+                    let hr = data.Items[0].info.HeartRate;
                     if (hr.avg == null || hr.min == null || hr.max == null || hr.avg_count == null) {
                         // we need to restore the stats
                         logger.info("HR Stats not in table. Updating...");
@@ -381,7 +386,7 @@ router.post('/updateStats', function(req, res) {
                             return callback(res);
                         });
                     } else {
-
+                        logger.info("Checking for new HR values to update the stats...");
                         // update the stats if there are new items in the DB since last update
                         const params = {
                             TableName: "HeartRate",
@@ -429,12 +434,12 @@ router.post('/updateStats', function(req, res) {
         };
 
         // function that will write in the stats decided by checkStats()
-        let writeStats = function(stats){
+        checkStats(function(stats){
             // end if there is nothing to update
             if (stats == null) {
-                returnJson.DynamoDB.message = "Stats already up to date";
-                returnJson.DynamoDB.error = false;
-                return res.status(200).send(returnJson);
+                logger.info("HR Stats already up to date");
+                updateWeeklyStats(weeklyStatsCallback);
+                return;
             }
 
             // otherwise update the Stats table
@@ -458,7 +463,7 @@ router.post('/updateStats', function(req, res) {
                     "#min": "min",
                     "#max": "max",
                 },
-                ReturnValues:"UPDATED_NEW"
+                ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
 
             };
 
@@ -468,26 +473,175 @@ router.post('/updateStats', function(req, res) {
                     logger.error("Error updating Stats HR table. Error JSON:", JSON.stringify(err, null, 2));
                     returnJson.DynamoDB.message = JSON.stringify(err, null, 2);
                     returnJson.DynamoDB.error = true;
-                    return res.status(400).send(returnJson);
+                    return res.status(500).send(returnJson);
                 } else {
-                    logger.info("Stats HR table updated!");
-                    returnJson.DynamoDB.message = JSON.stringify(data, null, 2);
-                    returnJson.DynamoDB.error = false;
-                    return res.status(200).send(returnJson);
+                    logger.info("HR Stats updated!");
+                    // move onto updating the weekly stats
+                    updateWeeklyStats(weeklyStatsCallback);
                 }
             });
 
-        };
+        });
 
-        // trigger function that will call writeStats once the stats have been decided
-        checkStats(writeStats);
-    };
+        function updateWeeklyStats(callback) {
+            logger.info("Calculating weeklyStats for HR...");
+            // firstly calculate the latest Sunday
+            const table = "WeeklyStats";
+            let sunday = new Date();
+            sunday.setHours(0,0,0,0);
+            while (sunday.getDay() != 0) { // 0 = Sunday
+                sunday.setTime(sunday.getTime() - 86400000); // i.e. minus one day
+            }
+            let date = parseInt(sunday.getTime().toString().substr(0,10));
+
+            const params = {
+                TableName: table,
+                KeyConditionExpression: "user_id = :user_id AND timestamp_weekStart >= :timestamp_weekStart",
+                ExpressionAttributeValues: {
+                    ":user_id" : user_id,
+                    ":timestamp_weekStart" : date
+                }
+            };
+
+            // query WeeklyStats if this Sunday exists
+            docClient.query(params, function(err, data) {
+                if (err) {
+                    logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
+                } else {
+                    if (data.Count > 0 && data.Items[0].info.HeartRate.avg != null) {
+                        // There already is an entry for this week
+                        const msg  = "There already exists an entry for HR in week : " + date;
+                        logger.info(msg);
+                        return callback(true, msg);
+                    } else {
+                        returnWeeksAverage(user_id, date, function(avg) {
+                            if(avg == null){return callback(false, "error in getting average for week starting: " + date)}
+                            // now store or update the calculated weekly average into the WeeklyStats table
+                            let params = {};
+
+                            if (data.Count > 0) { // update the row that exists
+                                logger.info("Updating WeeklyStats row that already exists...");
+
+                                const params = {
+                                    TableName: table,
+                                    Key:{
+                                        "user_id": user_id,
+                                        "timestamp_weekStart" : date
+                                    },
+                                    UpdateExpression: "set info.HeartRate.#avg = :avg",
+                                    ExpressionAttributeValues:{
+                                        ":avg": avg,
+                                    },
+                                    ExpressionAttributeNames: {
+                                        "#avg": "avg"
+                                    },
+                                    ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
+                                };
+
+                                // update dynamo table
+                                docClient.update(params, function(err, data) {
+                                    if (err) {
+                                        const msg = "Error updating WeeklyStats HR table. Error JSON: " + JSON.stringify(err, null, 2);
+                                        logger.error(msg);
+                                        return callback(false, msg);
+                                    } else {
+                                        const msg = "WeeklyStats row with week: " + date + " updated";
+                                        logger.info(msg);
+                                        return callback(true, msg);
+                                    }
+                                });
+
+                            } else { // create a new row as it doesn't exist
+                                logger.info("Creating new WeeklyStats row...");
+                                let json = api.newWeeklyStatsJson();
+                                json.HeartRate.avg = avg;
+                                params = {
+                                    TableName: table,
+                                    Item: {
+                                        "user_id": user_id,
+                                        "timestamp_weekStart": date,
+                                        "info": json
+                                    }
+                                };
+
+                                docClient.put(params,function(err, data) {
+                                    let msg ="";
+                                    if (err) {
+                                        msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
+                                        logger.error(msg);
+                                        return callback(false, msg);
+                                    } else {
+                                        msg = "New row added to WeeklyStats for week starting: " + date;
+                                        logger.debug(msg);
+                                        return callback(true, msg);
+                                    }
+                                });
+
+                            }
+                        });
+                    }
+
+                }
+            });
+
+            // function to take a HR week block and return its average
+            let returnWeeksAverage = function(user_id, date, callback) {
+                logger.info("Calculating average HR for week: " + date + "...");
+                const params = {
+                    TableName: "HeartRate",
+                    KeyConditionExpression: "user_id = :user_id AND #timestamp > :timestamp",
+                    ExpressionAttributeValues: {
+                        ":user_id" : user_id,
+                        ":timestamp" : date
+                    },
+                    ExpressionAttributeNames : {"#timestamp" : "timestamp"},
+                    Limit: 7
+                };
+
+                docClient.query(params, function(err, data) {
+                    if (err) {
+                        logger.error("Error reading HeartRate table. Error JSON:", JSON.stringify(err, null, 2));
+                    } else {
+                        if (data.Count < 1) {
+                            return callback(null)
+                        } else {
+                            let total = 0;
+                            for(let i = 0; i < data.Items.length; i++) {
+                                let hr = data.Items[i];
+                                if (hr.heartrate == null) {continue;} // skip days where HR wasn't recorded
+                                total += hr.heartrate;
+                            }
+                            let avg = Math.ceil(total / data.Items.length);
+                            return callback(avg);
+                        }
+                    }
+                });
+            }
+
+        }
+
+        // function that is called after weeklyStats to give an output message
+        function weeklyStatsCallback(success, message) {
+            const output = "HR weekly stats: " + message;
+            if (success) {
+                logger.info(output);
+                returnJson.DynamoDB.message = output;
+                returnJson.DynamoDB.error = false;
+                return res.status(200).send(returnJson);
+            } else {
+                logger.info(output);
+                returnJson.DynamoDB.message = output;
+                returnJson.DynamoDB.error = true;
+                return res.status(500).send(returnJson);
+            }
+        }
+    });
 
 
-    // continue only if token is authenticated
-    api.authenticateToken(token, user_id, proceed);
+
 
 
 });
+
 
 module.exports = router;

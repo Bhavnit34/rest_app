@@ -39,7 +39,7 @@ module.exports = {
     },
 
     newReturnJson: function() {
-        var json =
+        let json =
             {
                 Jawbone: {
                     message : "",
@@ -49,6 +49,19 @@ module.exports = {
                     message : "",
                     error : false
                 }
+            };
+        return json;
+    },
+
+    newWeeklyStatsJson: function() {
+        let json =
+            {
+                HeartRate : {avg: null},
+                Mood : {avg: null},
+                Moves : {avg: null},
+                Sleep : {avg: null},
+                Workouts : {avg: null},
+
             };
         return json;
     },

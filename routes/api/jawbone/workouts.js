@@ -256,7 +256,7 @@ router.post('/updateWorkouts', function(req,res_body){
             };
 
             // update table
-            logger.info("Adding workout " + i + " --> " + date + " for user " + user_id);
+            logger.info("Adding workout " + (i+1) + " --> " + date + " for user " + user_id);
             docClient.put(params, function (err, data) {
                 if (err) {
                     logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));

@@ -278,12 +278,11 @@ router.post('/updateHeartRates', function(req,res_body){
 });
 
 
-
-
 // function to calculate the stats from the whole table, if these values were lost
 function calculateInitialStats(userID, callback) {
     let avg = 0;
     let total = 0;
+    let totalCount = 0;
     let min = 0;
     let max = 0;
     const table = "HeartRate";
@@ -307,6 +306,7 @@ function calculateInitialStats(userID, callback) {
                 // loop through each row and cumliate the average
                 let hr = data.Items[i].heartrate;
                 if (hr != null) {
+                    totalCount++;
                     total += hr;
                     if (hr < min) {
                         min = hr;
@@ -315,7 +315,7 @@ function calculateInitialStats(userID, callback) {
                     }
                 }
             }
-            avg = Math.ceil(total / data.Items.length);
+            avg = Math.ceil(total / totalCount);
             const avg_count = data.Items.length;
             const timestamp_updated = Date.now().toString().substr(0,10);
 
@@ -408,11 +408,13 @@ router.post('/updateStats', function(req, res) {
                                 // calculate new stats
                                 const row = data.Items;
                                 let total = 0;
+                                let totalCount = 0; // use this so we don't include null heartrates in the averaging
                                 stats.max = hr.max;
                                 stats.min = hr.min;
                                 for (let i = 0; i < data.Items.length; i++) {
                                     let heartrate = row[i].heartrate;
-
+                                    if (heartrate == null) { continue; }
+                                    totalCount++;
                                     if (heartrate > hr.max) {
                                         stats.max = heartrate;
                                     } else if (heartrate < hr.min) {
@@ -422,8 +424,8 @@ router.post('/updateStats', function(req, res) {
 
                                 }
                                 // calculate new average by adding on the new values and dividng by (total + no. of new values)
-                                stats.avg = Math.ceil(((hr.avg * hr.avg_count) + total) / (hr.avg_count + data.Items.length));
-                                stats.avg_count = hr.avg_count + data.Items.length;
+                                stats.avg = Math.ceil(((hr.avg * hr.avg_count) + total) / (hr.avg_count + totalCount));
+                                stats.avg_count = hr.avg_count + totalCount;
                                 stats.timestamp_updated = Date.now().toString().substr(0, 10);
                                 return callback(stats);
                             }
@@ -606,12 +608,14 @@ router.post('/updateStats', function(req, res) {
                             return callback(null)
                         } else {
                             let total = 0;
+                            let totalCount = 0; // use this so we don't include the null items in the averaging
                             for(let i = 0; i < data.Items.length; i++) {
                                 let hr = data.Items[i];
                                 if (hr.heartrate == null) {continue;} // skip days where HR wasn't recorded
                                 total += hr.heartrate;
+                                totalCount++;
                             }
-                            let avg = Math.ceil(total / data.Items.length);
+                            let avg = Math.ceil(total / totalCount);
                             return callback(avg);
                         }
                     }

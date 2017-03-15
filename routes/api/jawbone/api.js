@@ -58,7 +58,12 @@ module.exports = {
             {
                 HeartRate : {avg: null},
                 Mood : {avg: null},
-                Moves : {avg: null},
+                Moves : {
+                    Steps: {avg: null},
+                    Distance: {avg: null},
+                    Calories: {avg: null},
+                    Active_time: {avg: null}
+                },
                 Sleep : {avg: null},
                 Workouts : {avg: null},
 

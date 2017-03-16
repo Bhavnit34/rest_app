@@ -56,17 +56,28 @@ module.exports = {
     newWeeklyStatsJson: function() {
         let json =
             {
-                HeartRate : {avg: null},
-                Mood : {avg: null},
-                Moves : {
-                    Steps: {avg: null},
-                    Distance: {avg: null},
+                HeartRate: {avg: null},
+                Mood: {avg: null},
+                Moves: {
+                    Count: {avg: null},
+                    Intensity: {avg: null},
                     Calories: {avg: null},
                     Active_time: {avg: null}
                 },
-                Sleep : {avg: null},
-                Workouts : {avg: null},
-
+                Sleep: {
+                    Intensity: {avg: null},
+                    Count: {avg: null},
+                    Calories: {avg: null},
+                    REM: {avg: null},
+                    Deep: {avg: null},
+                    Duration: {avg: null}
+                },
+                Workouts: {
+                    Count: {avg: null},
+                    Intensity: {avg: null},
+                    Calories: {avg: null},
+                    Time: {avg: null}
+                }
             };
         return json;
     },

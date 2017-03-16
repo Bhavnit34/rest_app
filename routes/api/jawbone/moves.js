@@ -759,18 +759,27 @@ router.post('/updateStats', function(req, res) {
                 if (err) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
-                    // to speed up checking for null, check for the string ":null" in the json
-                    let temp = JSON.stringify(data.Items[0].info.Moves);
-                    let jsonString = temp.replace(/ /g,''); // trim all whitespace
+                    let needNewAverage = false;
+                    if (data.Count > 0) {
+                        // to speed up checking for null, check for the string ":null" in the json
+                        let temp = JSON.stringify(data.Items[0].info.Moves);
+                        let jsonString = temp.replace(/ /g, ''); // trim all whitespace
 
-                    if (data.Steps > 0 && jsonString.indexOf(":null") == -1) {
-                        // There already is an entry for this week
-                        const msg  = "There already exists an entry for Moves in week : " + dateString;
-                        logger.info(msg);
-                        return callback(true, msg);
-                    } else {
-                        returnWeeksAverage(user_id, date, function(Averages) {
-                            if(Averages == null){return callback(false, "error in getting average for week starting: " + dateString)}
+                        if (jsonString.indexOf(":null") == -1) {
+                            // There already is an entry for this week
+                            const msg = "There already exists an entry for Moves in week : " + dateString;
+                            logger.info(msg);
+                            return callback(true, msg);
+                        } else {
+                            needNewAverage = true;
+                        }
+                    } else { needNewAverage = true;}
+
+                    if (needNewAverage) {
+                        returnWeeksAverage(user_id, date, function (Averages) {
+                            if (Averages == null) {
+                                return callback(false, "error in getting average for week starting: " + dateString)
+                            }
                             // now store or update the calculated weekly average into the WeeklyStats table
                             let params = {};
 
@@ -779,15 +788,15 @@ router.post('/updateStats', function(req, res) {
 
                                 const params = {
                                     TableName: table,
-                                    Key:{
+                                    Key: {
                                         "user_id": user_id,
-                                        "timestamp_weekStart" : date
+                                        "timestamp_weekStart": date
                                     },
                                     UpdateExpression: "set info.Moves.Steps.#avg = :steps_avg," +
-                                                    "info.Moves.Distance.#avg = :distance_avg," +
-                                                    "info.Moves.Calories.#avg = :calories_avg," +
-                                                    "info.Moves.Active_time.#avg = :activeTime_avg",
-                                    ExpressionAttributeValues:{
+                                    "info.Moves.Distance.#avg = :distance_avg," +
+                                    "info.Moves.Calories.#avg = :calories_avg," +
+                                    "info.Moves.Active_time.#avg = :activeTime_avg",
+                                    ExpressionAttributeValues: {
                                         ":steps_avg": Averages.steps,
                                         ":distance_avg": Averages.distance,
                                         ":calories_avg": Averages.calories,
@@ -797,11 +806,11 @@ router.post('/updateStats', function(req, res) {
                                     ExpressionAttributeNames: {
                                         "#avg": "avg"
                                     },
-                                    ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
+                                    ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
                                 };
 
                                 // update dynamo table
-                                docClient.update(params, function(err, data) {
+                                docClient.update(params, function (err, data) {
                                     if (err) {
                                         const msg = "Error updating WeeklyStats Moves table. Error JSON: " + JSON.stringify(err, null, 2);
                                         logger.error(msg);
@@ -816,10 +825,10 @@ router.post('/updateStats', function(req, res) {
                             } else { // create a new row as it doesn't exist
                                 logger.info("Creating new WeeklyStats row...");
                                 let json = api.newWeeklyStatsJson();
-                                json.Moves.Steps.avg = Averages.Steps;
-                                json.Moves.Distance.avg = Averages.Distance;
-                                json.Moves.Calories.avg = Averages.Calories;
-                                json.Moves.Active_time.avg = Averages.ActiveTime;
+                                json.Moves.Steps.avg = Averages.steps;
+                                json.Moves.Distance.avg = Averages.distance;
+                                json.Moves.Calories.avg = Averages.calories;
+                                json.Moves.Active_time.avg = Averages.activeTime;
                                 params = {
                                     TableName: table,
                                     Item: {
@@ -829,8 +838,8 @@ router.post('/updateStats', function(req, res) {
                                     }
                                 };
 
-                                docClient.put(params,function(err, data) {
-                                    let msg ="";
+                                docClient.put(params, function (err, data) {
+                                    let msg = "";
                                     if (err) {
                                         msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
                                         logger.error(msg);
@@ -845,6 +854,7 @@ router.post('/updateStats', function(req, res) {
                             }
                         });
                     }
+
 
                 }
             });
@@ -915,7 +925,7 @@ router.post('/updateStats', function(req, res) {
                             }
 
                             // Calculate averages
-                            let Averages = {steps: 0, distance: 0, calories: 0, activeTime: 0};
+                            let Averages = {steps: 0, sistance: 0, calories: 0, activeTime: 0};
                             Averages.steps = Math.ceil(Steps.total / Steps.totalCount);
                             Averages.distance = Math.ceil(Distance.total / Distance.totalCount);
                             Averages.calories = Math.ceil(Calories.total / Calories.totalCount);

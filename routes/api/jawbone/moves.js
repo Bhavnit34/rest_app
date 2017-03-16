@@ -394,8 +394,8 @@ function calculateInitialStats(userID, callback) {
                 if (distance != null) {
                     Distance.totalCount++;
                     Distance.total += distance;
-                    if (steps < Distance.min) {
-                        Distance.min = steps;
+                    if (distance < Distance.min) {
+                        Distance.min = distance;
                     } else if (distance > Distance.max) {
                         Distance.max = distance;
                     }
@@ -570,9 +570,9 @@ router.post('/updateStats', function(req, res) {
                                     let steps = row[i].info.details.steps;
                                     if (steps != null) {
                                         Steps.totalCount++;
-                                        if (steps > mv.Steps.max) {
+                                        if (steps > newStats.Steps.max) {
                                             newStats.Steps.max = steps;
-                                        } else if (steps < mv.Steps.min) {
+                                        } else if (steps < newStats.Steps.min) {
                                             newStats.Steps.min = steps;
                                         }
                                         Steps.total += steps;
@@ -582,9 +582,9 @@ router.post('/updateStats', function(req, res) {
                                     let distance = row[i].info.details.distance;
                                     if (distance != null) {
                                         Distance.totalCount++;
-                                        if (distance > mv.Distance.max) {
+                                        if (distance > newStats.Distance.max) {
                                             newStats.Distance.max = distance;
-                                        } else if (distance < mv.Distance.min) {
+                                        } else if (distance < newStats.Distance.min) {
                                             newStats.Distance.min = distance;
                                         }
                                         Distance.total += distance;
@@ -594,9 +594,9 @@ router.post('/updateStats', function(req, res) {
                                     let calories = row[i].info.details.calories;
                                     if (calories != null) {
                                         Calories.totalCount++;
-                                        if (calories > mv.Calories.max) {
+                                        if (calories > newStats.Calories.max) {
                                             newStats.Calories.max = calories;
-                                        } else if (calories < mv.Calories.min) {
+                                        } else if (calories < newStats.Calories.min) {
                                             newStats.Calories.min = calories;
                                         }
                                         Calories.total += calories;
@@ -606,9 +606,9 @@ router.post('/updateStats', function(req, res) {
                                     let activeTime = row[i].info.details.active_time;
                                     if (activeTime != null) {
                                         ActiveTime.totalCount++;
-                                        if (activeTime > mv.Active_time.max) {
+                                        if (activeTime > newStats.Active_time.max) {
                                             newStats.ActiveTime.max = activeTime;
-                                        } else if (activeTime < mv.Active_time.min) {
+                                        } else if (activeTime < newStats.Active_time.min) {
                                             newStats.ActiveTime.min = activeTime;
                                         }
                                         ActiveTime.total += activeTime;
@@ -742,6 +742,8 @@ router.post('/updateStats', function(req, res) {
                 sunday.setTime(sunday.getTime() - 86400000); // i.e. minus one day
             }
             let date = parseInt(sunday.getTime().toString().substr(0,10));
+            let fullDate = new Date(date * 1000);
+            let dateString = fullDate.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
 
             const params = {
                 TableName: table,
@@ -763,12 +765,12 @@ router.post('/updateStats', function(req, res) {
 
                     if (data.Count > 0 && jsonString.indexOf(":null") == -1) {
                         // There already is an entry for this week
-                        const msg  = "There already exists an entry for Moves in week : " + date;
+                        const msg  = "There already exists an entry for Moves in week : " + dateString;
                         logger.info(msg);
                         return callback(true, msg);
                     } else {
                         returnWeeksAverage(user_id, date, function(Averages) {
-                            if(Averages == null){return callback(false, "error in getting average for week starting: " + date)}
+                            if(Averages == null){return callback(false, "error in getting average for week starting: " + dateString)}
                             // now store or update the calculated weekly average into the WeeklyStats table
                             let params = {};
 
@@ -805,7 +807,7 @@ router.post('/updateStats', function(req, res) {
                                         logger.error(msg);
                                         return callback(false, msg);
                                     } else {
-                                        const msg = "WeeklyStats row with week: " + date + " updated";
+                                        const msg = "WeeklyStats row with week: " + dateString + " updated";
                                         logger.info(msg);
                                         return callback(true, msg);
                                     }
@@ -814,7 +816,10 @@ router.post('/updateStats', function(req, res) {
                             } else { // create a new row as it doesn't exist
                                 logger.info("Creating new WeeklyStats row...");
                                 let json = api.newWeeklyStatsJson();
-                                json.Moves.Steps.avg = Averages;
+                                json.Moves.Active_time.avg = Averages.activeTime;
+                                json.Moves.Distance.avg = Averages.distance;
+                                json.Moves.calories.avg = Averages.calories;
+                                json.Moves.Steps.avg = Averages.steps;
                                 params = {
                                     TableName: table,
                                     Item: {
@@ -831,7 +836,7 @@ router.post('/updateStats', function(req, res) {
                                         logger.error(msg);
                                         return callback(false, msg);
                                     } else {
-                                        msg = "New row added to WeeklyStats for week starting: " + date;
+                                        msg = "New row added to WeeklyStats for week starting: " + dateString;
                                         logger.debug(msg);
                                         return callback(true, msg);
                                     }

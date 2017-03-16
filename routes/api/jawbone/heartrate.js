@@ -415,9 +415,9 @@ router.post('/updateStats', function(req, res) {
                                     let heartrate = row[i].heartrate;
                                     if (heartrate == null) { continue; }
                                     totalCount++;
-                                    if (heartrate > hr.max) {
+                                    if (heartrate > stats.max) {
                                         stats.max = heartrate;
-                                    } else if (heartrate < hr.min) {
+                                    } else if (heartrate < stats.min) {
                                         stats.min = heartrate;
                                     }
                                     total += heartrate;
@@ -495,6 +495,8 @@ router.post('/updateStats', function(req, res) {
                 sunday.setTime(sunday.getTime() - 86400000); // i.e. minus one day
             }
             let date = parseInt(sunday.getTime().toString().substr(0,10));
+            let fullDate = new Date(date * 1000);
+            let dateString = fullDate.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
 
             const params = {
                 TableName: table,
@@ -512,12 +514,12 @@ router.post('/updateStats', function(req, res) {
                 } else {
                     if (data.Count > 0 && data.Items[0].info.HeartRate.avg != null) {
                         // There already is an entry for this week
-                        const msg  = "There already exists an entry for HR in week : " + date;
+                        const msg  = "There already exists an entry for HR in week : " + dateString;
                         logger.info(msg);
                         return callback(true, msg);
                     } else {
                         returnWeeksAverage(user_id, date, function(avg) {
-                            if(avg == null){return callback(false, "error in getting average for week starting: " + date)}
+                            if(avg == null){return callback(false, "error in getting average for week starting: " + dateString)}
                             // now store or update the calculated weekly average into the WeeklyStats table
                             let params = {};
 
@@ -547,7 +549,7 @@ router.post('/updateStats', function(req, res) {
                                         logger.error(msg);
                                         return callback(false, msg);
                                     } else {
-                                        const msg = "WeeklyStats row with week: " + date + " updated";
+                                        const msg = "WeeklyStats row with week: " + dateString + " updated";
                                         logger.info(msg);
                                         return callback(true, msg);
                                     }
@@ -573,7 +575,7 @@ router.post('/updateStats', function(req, res) {
                                         logger.error(msg);
                                         return callback(false, msg);
                                     } else {
-                                        msg = "New row added to WeeklyStats for week starting: " + date;
+                                        msg = "New row added to WeeklyStats for week starting: " + dateString;
                                         logger.debug(msg);
                                         return callback(true, msg);
                                     }

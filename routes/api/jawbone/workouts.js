@@ -282,7 +282,7 @@ function calculateInitialStats(userID, callback) {
     let Time = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
 
 
-    const table = "Moves";
+    const table = "Workouts";
     const params = {
         TableName: table,
         KeyConditionExpression: "user_id = :user_id",
@@ -292,18 +292,18 @@ function calculateInitialStats(userID, callback) {
 
     docClient.query(params, function(err, data) {
         if (err) {
-            logger.error("Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
+            logger.error("Unable to read Workouts item. Error JSON:", JSON.stringify(err, null, 2));
         } else {
             // proceed to calculating the stats
             Calories.min = data.Items[0].info.details.calories;
             Calories.max = data.Items[0].info.details.calories;
-            Time.max = data.Items[0].info.details.active_time;
-            Time.min = data.Items[0].info.details.active_time;
+            Time.max = data.Items[0].info.details.time;
+            Time.min = data.Items[0].info.details.time;
             for(let i = 0; i < data.Items.length; i++) {
                 // loop through each row and cumulate the average
 
-                // steps
-                let count = data.Items[i].info.details.steps;
+                // Count
+                let count = data.Items[i].info.details.count;
                 if (count != null) {
                     Count.totalCount++;
                     Count.total += count;
@@ -314,11 +314,11 @@ function calculateInitialStats(userID, callback) {
                     }
                 }
 
-                // distance
-                let distance = data.Items[i].info.details.intensity;
-                if (distance != null) {
+                // intensity
+                let intensity = data.Items[i].info.details.intensity;
+                if (intensity != null) {
                     Intensity.totalCount++;
-                    Intensity.total += distance;
+                    Intensity.total += intensity;
                 }
 
                 // calories
@@ -448,7 +448,7 @@ router.post('/updateStats', function(req, res) {
                             return callback(res);
                         });
                     } else {
-                        logger.info("Checking for new Moves values to update the stats...");
+                        logger.info("Checking for new Workouts values to update the stats...");
                         // update the stats if there are new items in the DB since last update
                         const params = {
                             TableName: "Workouts",
@@ -466,7 +466,7 @@ router.post('/updateStats', function(req, res) {
                                 if(data.Count == 0) {return callback(null);} // don't write any stats if there are no updates
                                 // calculate new stats by taking into account the new values
                                 const row = data.Items;
-                                // use these so we don't include null moves in the averaging
+                                // use these so we don't include null Workouts in the averaging
                                 let Count = { total: 0, totalCount : 0};
                                 let Intensity = { total: 0, totalCount : 0};
                                 let Calories = { total: 0, totalCount : 0};
@@ -474,12 +474,12 @@ router.post('/updateStats', function(req, res) {
                                 // assign local min/max to what we currently have in the stats table
                                 newStats.Calories.max = wo.Calories.max;
                                 newStats.Calories.min = wo.Calories.min;
-                                newStats.Time.max = wo.Active_time.max;
-                                newStats.Time.min = wo.Active_time.min;
+                                newStats.Time.max = wo.Time.max;
+                                newStats.Time.min = wo.Time.min;
 
                                 for (let i = 0; i < data.Items.length; i++) {
-                                    // steps
-                                    let count = row[i].info.details.steps;
+                                    // count
+                                    let count = row[i].info.details.count;
                                     if (count != null) {
                                         Count.totalCount++;
                                         Count.total += count;
@@ -508,9 +508,9 @@ router.post('/updateStats', function(req, res) {
                                     let time = row[i].info.details.time;
                                     if (time != null) {
                                         Time.totalCount++;
-                                        if (time > newStats.Active_time.max) {
+                                        if (time > newStats.Time.max) {
                                             newStats.Time.max = time;
-                                        } else if (time < newStats.Active_time.min) {
+                                        } else if (time < newStats.Time.min) {
                                             newStats.Time.min = time;
                                         }
                                         Time.total += time;
@@ -518,11 +518,11 @@ router.post('/updateStats', function(req, res) {
 
                                 }
                                 // calculate new average by adding on the new values and dividng by (total + no. of new values)
-                                // steps
+                                // Count
                                 newStats.Count.avg = Math.ceil(((wo.Count.avg * wo.Count.avg_count) + Count.total) / (wo.Count.avg_count + Count.totalCount));
                                 newStats.Count.avg_count = wo.Count.avg_count + Count.totalCount;
                                 newStats.Count.timestamp_updated = Date.now().toString().substr(0, 10);
-                                // distance
+                                // intensity
                                 newStats.Intensity.avg = Math.ceil(((wo.Intensity.avg * wo.Intensity.avg_count) + Intensity.total) / (wo.Intensity.avg_count + Intensity.totalCount));
                                 newStats.Intensity.avg_count = wo.Intensity.avg_count + Intensity.totalCount;
                                 newStats.Intensity.timestamp_updated = Date.now().toString().substr(0, 10);
@@ -530,9 +530,9 @@ router.post('/updateStats', function(req, res) {
                                 newStats.Calories.avg = Math.ceil(((wo.Calories.avg * wo.Calories.avg_count) + Calories.total) / (wo.Calories.avg_count + Calories.totalCount));
                                 newStats.Calories.avg_count = wo.Calories.avg_count + Calories.totalCount;
                                 newStats.Calories.timestamp_updated = Date.now().toString().substr(0, 10);
-                                // active time
-                                newStats.Time.avg = Math.ceil(((wo.Active_time.avg * wo.Active_time.avg_count) + Time.total) / (wo.Active_time.avg_count + Time.totalCount));
-                                newStats.Time.avg_count = wo.Active_time.avg_count + Time.totalCount;
+                                // Time
+                                newStats.Time.avg = Math.ceil(((wo.Time.avg * wo.Time.avg_count) + Time.total) / (wo.Time.avg_count + Time.totalCount));
+                                newStats.Time.avg_count = wo.Time.avg_count + Time.totalCount;
                                 newStats.Time.timestamp_updated = Date.now().toString().substr(0, 10);
                                 return callback(newStats);
                             }
@@ -557,49 +557,49 @@ router.post('/updateStats', function(req, res) {
             const params = {
                 TableName:"Stats",
                 Key:{"user_id": user_id},
-                UpdateExpression: "set info.Moves.Count.#avg = :Count_avg," +
-                " info.Moves.Count.avg_count = :Count_avg_count," +
-                " info.Moves.Count.timestamp_updated = :Count_timestamp_updated," +
+                UpdateExpression: "set info.Workouts.Count.#avg = :Count_avg," +
+                " info.Workouts.Count.avg_count = :Count_avg_count," +
+                " info.Workouts.Count.timestamp_updated = :Count_timestamp_updated," +
 
-                " info.Moves.Intensity.#avg = :Intensity_avg," +
-                " info.Moves.Intensity.avg_count = :Intensity_avg_count," +
-                " info.Moves.Intensity.timestamp_updated = :Intensity_timestamp_updated," +
+                " info.Workouts.Intensity.#avg = :Intensity_avg," +
+                " info.Workouts.Intensity.avg_count = :Intensity_avg_count," +
+                " info.Workouts.Intensity.timestamp_updated = :Intensity_timestamp_updated," +
 
-                " info.Moves.Calories.#avg = :Calories_avg," +
-                " info.Moves.Calories.#min = :Calories_min," +
-                " info.Moves.Calories.#max = :Calories_max," +
-                " info.Moves.Calories.avg_count = :Calories_avg_count," +
-                " info.Moves.Calories.timestamp_updated = :Calories_timestamp_updated," +
+                " info.Workouts.Calories.#avg = :Calories_avg," +
+                " info.Workouts.Calories.#min = :Calories_min," +
+                " info.Workouts.Calories.#max = :Calories_max," +
+                " info.Workouts.Calories.avg_count = :Calories_avg_count," +
+                " info.Workouts.Calories.timestamp_updated = :Calories_timestamp_updated," +
 
-                " info.Moves.Time.#avg = :Time_avg," +
-                " info.Moves.Time.#min = :Time_min," +
-                " info.Moves.Time.#max = :Time_max," +
-                " info.Moves.Time.avg_count = :Time_avg_count," +
-                " info.Moves.Time.timestamp_updated = :Time_timestamp_updated",
+                " info.Workouts.Time.#avg = :Time_avg," +
+                " info.Workouts.Time.#min = :Time_min," +
+                " info.Workouts.Time.#max = :Time_max," +
+                " info.Workouts.Time.avg_count = :Time_avg_count," +
+                " info.Workouts.Time.timestamp_updated = :Time_timestamp_updated",
                 ExpressionAttributeValues:{
                     // count
-                    ":steps_avg_count": stats.Count.avg_count,
-                    ":steps_avg": stats.Count.avg,
-                    ":steps_timestamp_updated" : parseInt(stats.Count.timestamp_updated),
+                    ":Count_avg_count": stats.Count.avg_count,
+                    ":Count_avg": stats.Count.avg,
+                    ":Count_timestamp_updated" : parseInt(stats.Count.timestamp_updated),
 
                     // intensity
-                    ":distance_avg_count": stats.Intensity.avg_count,
-                    ":distance_avg": stats.Intensity.avg,
-                    ":distance_timestamp_updated" : parseInt(stats.Intensity.timestamp_updated),
+                    ":Intensity_avg_count": stats.Intensity.avg_count,
+                    ":Intensity_avg": stats.Intensity.avg,
+                    ":Intensity_timestamp_updated" : parseInt(stats.Intensity.timestamp_updated),
 
                     // calories
-                    ":calories_min": stats.Calories.min,
-                    ":calories_max": stats.Calories.max,
-                    ":calories_avg_count": stats.Calories.avg_count,
-                    ":calories_avg": stats.Calories.avg,
-                    ":calories_timestamp_updated" : parseInt(stats.Calories.timestamp_updated),
+                    ":Calories_min": stats.Calories.min,
+                    ":Calories_max": stats.Calories.max,
+                    ":Calories_avg_count": stats.Calories.avg_count,
+                    ":Calories_avg": stats.Calories.avg,
+                    ":Calories_timestamp_updated" : parseInt(stats.Calories.timestamp_updated),
 
                     // time
-                    ":activeTime_min": stats.Time.min,
-                    ":activeTime_max": stats.Time.max,
-                    ":activeTime_avg_count": stats.Time.avg_count,
-                    ":activeTime_avg": stats.Time.avg,
-                    ":activeTime_timestamp_updated" : parseInt(stats.Time.timestamp_updated)
+                    ":Time_min": stats.Time.min,
+                    ":Time_max": stats.Time.max,
+                    ":Time_avg_count": stats.Time.avg_count,
+                    ":Time_avg": stats.Time.avg,
+                    ":Time_timestamp_updated" : parseInt(stats.Time.timestamp_updated)
                 },
                 ExpressionAttributeNames: {
                     "#avg": "avg",
@@ -654,7 +654,7 @@ router.post('/updateStats', function(req, res) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
                     // to speed up checking for null, check for the string ":null" in the json
-                    let temp = JSON.stringify(data.Items[0].info.Moves);
+                    let temp = JSON.stringify(data.Items[0].info.Workouts);
                     let jsonString = temp.replace(/ /g,''); // trim all whitespace
 
                     if (data.Count > 0 && jsonString.indexOf(":null") == -1) {
@@ -774,13 +774,13 @@ router.post('/updateStats', function(req, res) {
                                 if (workout == null) { continue ;}
 
                                 // count
-                                let count = workout.details.awake_time;
+                                let count = workout.details.count;
                                 if (count != null) {
                                     Count.total += count;
                                     Count.totalCount++;
                                 }
 
-                                // asleep time
+                                // intensity
                                 let intensity = workout.details.intensity;
                                 if (intensity != null) {
                                     Intensity.total += intensity;

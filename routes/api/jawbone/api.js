@@ -59,23 +59,23 @@ module.exports = {
                 HeartRate: {avg: null},
                 Mood: {avg: null},
                 Moves: {
-                    Count: {avg: null},
-                    Intensity: {avg: null},
-                    Calories: {avg: null},
+                    AwakeTime: {avg: null},
+                    AsleepTime: {avg: null},
+                    Light: {avg: null},
                     Active_time: {avg: null}
                 },
                 Sleep: {
-                    Intensity: {avg: null},
-                    Count: {avg: null},
-                    Calories: {avg: null},
+                    AsleepTime: {avg: null},
+                    AwakeTime: {avg: null},
+                    Light: {avg: null},
                     REM: {avg: null},
                     Deep: {avg: null},
                     Duration: {avg: null}
                 },
                 Workouts: {
-                    Count: {avg: null},
-                    Intensity: {avg: null},
-                    Calories: {avg: null},
+                    AwakeTime: {avg: null},
+                    AsleepTime: {avg: null},
+                    Light: {avg: null},
                     Time: {avg: null}
                 }
             };

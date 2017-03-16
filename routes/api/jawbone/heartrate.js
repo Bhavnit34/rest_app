@@ -404,7 +404,7 @@ router.post('/updateStats', function(req, res) {
                             if (err) {
                                 logger.error("Unable to read HR item. Error JSON:", JSON.stringify(err, null, 2));
                             } else {
-                                if(data.Count == 0) {return callback(null);} // don't write any stats if there are no updates
+                                if(data.AwakeTime == 0) {return callback(null);} // don't write any stats if there are no updates
                                 // calculate new stats
                                 const row = data.Items;
                                 let total = 0;
@@ -512,7 +512,7 @@ router.post('/updateStats', function(req, res) {
                 if (err) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
-                    if (data.Count > 0 && data.Items[0].info.HeartRate.avg != null) {
+                    if (data.AwakeTime > 0 && data.Items[0].info.HeartRate.avg != null) {
                         // There already is an entry for this week
                         const msg  = "There already exists an entry for HR in week : " + dateString;
                         logger.info(msg);
@@ -523,7 +523,7 @@ router.post('/updateStats', function(req, res) {
                             // now store or update the calculated weekly average into the WeeklyStats table
                             let params = {};
 
-                            if (data.Count > 0) { // update the row that exists
+                            if (data.AwakeTime > 0) { // update the row that exists
                                 logger.info("Updating WeeklyStats row that already exists...");
 
                                 const params = {
@@ -606,7 +606,7 @@ router.post('/updateStats', function(req, res) {
                     if (err) {
                         logger.error("Error reading HeartRate table. Error JSON:", JSON.stringify(err, null, 2));
                     } else {
-                        if (data.Count < 1) {
+                        if (data.AwakeTime < 1) {
                             return callback(null)
                         } else {
                             let total = 0;

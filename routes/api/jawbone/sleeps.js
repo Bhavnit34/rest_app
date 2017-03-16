@@ -299,7 +299,7 @@ function calculateInitialStats(userID, callback) {
 
     docClient.query(params, function(err, data) {
         if (err) {
-            logger.error("Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
+            logger.error("Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
         } else {
             // proceed to calculating the stats
             Light.min = data.Items[0].info.details.light;
@@ -410,17 +410,17 @@ function calculateInitialStats(userID, callback) {
             const timestamp_updated = Date.now().toString().substr(0,10);
 
             let stats = {
-                Count : {
+                AwakeTime : {
                     avg: AwakeTime.avg,
                     avg_count: AwakeTime.totalCount,
                     timestamp_updated: timestamp_updated
                 },
-                Intensity : {
+                AsleepTime : {
                     avg: AsleepTime.avg,
                     avg_count: AsleepTime.totalCount,
                     timestamp_updated: timestamp_updated
                 },
-                Calories : {
+                Light : {
                     avg: Light.avg,
                     min: Light.min,
                     max: Light.max,
@@ -464,9 +464,9 @@ router.post('/updateStats', function(req, res) {
     let returnJson = api.newReturnJson();
     let token = "";
     let newStats = {
-        Count: {avg: 0, avg_count: 0, timestamp_updated: 0},
-        Intensity: {avg: 0, avg_count: 0, timestamp_updated: 0},
-        Calories: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
+        AwakeTime: {avg: 0, avg_count: 0, timestamp_updated: 0},
+        AsleepTime: {avg: 0, avg_count: 0, timestamp_updated: 0},
+        Light: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
         REM: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
         Deep: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
         Duration: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0}
@@ -529,7 +529,7 @@ router.post('/updateStats', function(req, res) {
                             KeyConditionExpression: "user_id = :user_id AND timestamp_completed > :timestamp",
                             ExpressionAttributeValues: {
                                 ":user_id": user_id,
-                                ":timestamp": sleep.Count.timestamp_updated
+                                ":timestamp": sleep.AwakeTime.timestamp_updated
                             }
                         };
 
@@ -537,12 +537,12 @@ router.post('/updateStats', function(req, res) {
                             if (err) {
                                 logger.error("Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
                             } else {
-                                if (data.Count == 0) {
+                                if (data.AwakeTime == 0) {
                                     return callback(null);
                                 } // don't write any stats if there are no updates
                                 // calculate new stats by taking into account the new values
                                 const row = data.Items;
-                                // use these so we don't include null moves in the averaging
+                                // use these so we don't include null Sleeps in the averaging
                                 let AwakeTime = {total: 0, totalCount: 0};
                                 let AsleepTime = {total: 0, totalCount: 0};
                                 let Light = {total: 0, totalCount: 0};
@@ -552,8 +552,8 @@ router.post('/updateStats', function(req, res) {
 
 
                                 // assign local min/max to what we currently have in the stats table
-                                newStats.Calories.max = sleep.Calories.max;
-                                newStats.Calories.min = sleep.Calories.min;
+                                newStats.Light.max = sleep.Light.max;
+                                newStats.Light.min = sleep.Light.min;
                                 newStats.REM.max = sleep.REM.max;
                                 newStats.REM.min = sleep.REM.min;
                                 newStats.Deep.max = sleep.Deep.max;
@@ -595,10 +595,10 @@ router.post('/updateStats', function(req, res) {
                                     let light = row[i].info.details.light;
                                     if (light != null) {
                                         Light.totalCount++;
-                                        if (light > newStats.Calories.max) {
-                                            newStats.Calories.max = light;
-                                        } else if (light < newStats.Calories.min) {
-                                            newStats.Calories.min = light;
+                                        if (light > newStats.Light.max) {
+                                            newStats.Light.max = light;
+                                        } else if (light < newStats.Light.min) {
+                                            newStats.Light.min = light;
                                         }
                                         Light.total += light;
                                     }
@@ -644,17 +644,17 @@ router.post('/updateStats', function(req, res) {
                                 }
                                 // calculate new average by adding on the new values and dividng by (total + no. of new values)
                                 // awake time
-                                newStats.Count.avg = Math.ceil(((sleep.Count.avg * sleep.Count.avg_count) + AwakeTime.total) / (sleep.Count.avg_count + AwakeTime.totalCount));
-                                newStats.Count.avg_count = sleep.Count.avg_count + AwakeTime.totalCount;
-                                newStats.Count.timestamp_updated = Date.now().toString().substr(0, 10);
+                                newStats.AwakeTime.avg = Math.ceil(((sleep.AwakeTime.avg * sleep.AwakeTime.avg_count) + AwakeTime.total) / (sleep.AwakeTime.avg_count + AwakeTime.totalCount));
+                                newStats.AwakeTime.avg_count = sleep.AwakeTime.avg_count + AwakeTime.totalCount;
+                                newStats.AwakeTime.timestamp_updated = Date.now().toString().substr(0, 10);
                                 // asleep time
-                                newStats.Intensity.avg = Math.ceil(((sleep.Intensity.avg * sleep.Intensity.avg_count) + AsleepTime.total) / (sleep.Intensity.avg_count + AsleepTime.totalCount));
-                                newStats.Intensity.avg_count = sleep.Intensity.avg_count + AsleepTime.totalCount;
-                                newStats.Intensity.timestamp_updated = Date.now().toString().substr(0, 10);
+                                newStats.AsleepTime.avg = Math.ceil(((sleep.AsleepTime.avg * sleep.AsleepTime.avg_count) + AsleepTime.total) / (sleep.AsleepTime.avg_count + AsleepTime.totalCount));
+                                newStats.AsleepTime.avg_count = sleep.AsleepTime.avg_count + AsleepTime.totalCount;
+                                newStats.AsleepTime.timestamp_updated = Date.now().toString().substr(0, 10);
                                 // light sleep
-                                newStats.Calories.avg = Math.ceil(((sleep.Calories.avg * sleep.Calories.avg_count) + Light.total) / (sleep.Calories.avg_count + Light.totalCount));
-                                newStats.Calories.avg_count = sleep.Calories.avg_count + Light.totalCount;
-                                newStats.Calories.timestamp_updated = Date.now().toString().substr(0, 10);
+                                newStats.Light.avg = Math.ceil(((sleep.Light.avg * sleep.Light.avg_count) + Light.total) / (sleep.Light.avg_count + Light.totalCount));
+                                newStats.Light.avg_count = sleep.Light.avg_count + Light.totalCount;
+                                newStats.Light.timestamp_updated = Date.now().toString().substr(0, 10);
                                 // REM sleep
                                 newStats.REM.avg = Math.ceil(((sleep.REM.avg * sleep.REM.avg_count) + REM.total) / (sleep.REM.avg_count + REM.totalCount));
                                 newStats.REM.avg_count = sleep.REM.avg_count + REM.totalCount;
@@ -690,19 +690,19 @@ router.post('/updateStats', function(req, res) {
             const params = {
                 TableName: "Stats",
                 Key: {"user_id": user_id},
-                UpdateExpression: "set info.Sleep.Count.#avg = :AwakeTime_avg," +
-                " info.Sleep.Count.avg_count = :AwakeTime_avg_count," +
-                " info.Sleep.Count.timestamp_updated = :AwakeTime_timestamp_updated," +
+                UpdateExpression: "set info.Sleep.AwakeTime.#avg = :AwakeTime_avg," +
+                " info.Sleep.AwakeTime.avg_count = :AwakeTime_avg_count," +
+                " info.Sleep.AwakeTime.timestamp_updated = :AwakeTime_timestamp_updated," +
 
-                " info.Sleep.Intensity.#avg = :AsleepTime_avg," +
-                " info.Sleep.Intensity.avg_count = :AsleepTime_avg_count," +
-                " info.Sleep.Intensity.timestamp_updated = :AsleepTime_timestamp_updated," +
+                " info.Sleep.AsleepTime.#avg = :AsleepTime_avg," +
+                " info.Sleep.AsleepTime.avg_count = :AsleepTime_avg_count," +
+                " info.Sleep.AsleepTime.timestamp_updated = :AsleepTime_timestamp_updated," +
 
-                " info.Sleep.Calories.#avg = :Light_avg," +
-                " info.Sleep.Calories.#min = :Light_min," +
-                " info.Sleep.Calories.#max = :Light_max," +
-                " info.Sleep.Calories.avg_count = :Light_avg_count," +
-                " info.Sleep.Calories.timestamp_updated = :Light_timestamp_updated," +
+                " info.Sleep.Light.#avg = :Light_avg," +
+                " info.Sleep.Light.#min = :Light_min," +
+                " info.Sleep.Light.#max = :Light_max," +
+                " info.Sleep.Light.avg_count = :Light_avg_count," +
+                " info.Sleep.Light.timestamp_updated = :Light_timestamp_updated," +
 
                 " info.Sleep.REM.#avg = :REM_avg," +
                 " info.Sleep.REM.#min = :REM_min," +
@@ -725,21 +725,21 @@ router.post('/updateStats', function(req, res) {
 
                 ExpressionAttributeValues: {
                     // awake time
-                    ":AwakeTime_avg_count": stats.Count.avg_count,
-                    ":AwakeTime_avg": stats.Count.avg,
-                    ":AwakeTime_timestamp_updated": parseInt(stats.Count.timestamp_updated),
+                    ":AwakeTime_avg_count": stats.AwakeTime.avg_count,
+                    ":AwakeTime_avg": stats.AwakeTime.avg,
+                    ":AwakeTime_timestamp_updated": parseInt(stats.AwakeTime.timestamp_updated),
 
                     // asleep time
-                    ":AsleepTime_avg_count": stats.Intensity.avg_count,
-                    ":AsleepTime_avg": stats.Intensity.avg,
-                    ":AsleepTime_timestamp_updated": parseInt(stats.Intensity.timestamp_updated),
+                    ":AsleepTime_avg_count": stats.AsleepTime.avg_count,
+                    ":AsleepTime_avg": stats.AsleepTime.avg,
+                    ":AsleepTime_timestamp_updated": parseInt(stats.AsleepTime.timestamp_updated),
 
                     // light
-                    ":Light_min": stats.Calories.min,
-                    ":Light_max": stats.Calories.max,
-                    ":Light_avg_count": stats.Calories.avg_count,
-                    ":Light_avg": stats.Calories.avg,
-                    ":Light_timestamp_updated": parseInt(stats.Calories.timestamp_updated),
+                    ":Light_min": stats.Light.min,
+                    ":Light_max": stats.Light.max,
+                    ":Light_avg_count": stats.Light.avg_count,
+                    ":Light_avg": stats.Light.avg,
+                    ":Light_timestamp_updated": parseInt(stats.Light.timestamp_updated),
 
                     // REM
                     ":REM_min": stats.REM.min,
@@ -819,7 +819,7 @@ router.post('/updateStats', function(req, res) {
                     let temp = JSON.stringify(data.Items[0].info.Sleep);
                     let jsonString = temp.replace(/ /g, ''); // trim all whitespace
 
-                    if (data.Count > 0 && jsonString.indexOf(":null") == -1) {
+                    if (data.AwakeTime > 0 && jsonString.indexOf(":null") == -1) {
                         // There already is an entry for this week
                         const msg = "There already exists an entry for Sleep in week : " + dateString;
                         logger.info(msg);
@@ -832,7 +832,7 @@ router.post('/updateStats', function(req, res) {
                             // now store or update the calculated weekly average into the WeeklyStats table
                             let params = {};
 
-                            if (data.Count > 0) { // update the row that exists
+                            if (data.AwakeTime > 0) { // update the row that exists
                                 logger.info("Updating WeeklyStats row that already exists...");
 
                                 const params = {
@@ -841,17 +841,17 @@ router.post('/updateStats', function(req, res) {
                                         "user_id": user_id,
                                         "timestamp_weekStart": date
                                     },
-                                    UpdateExpression: "set info.Sleep.Count.#avg = :AwakeTime_avg," +
-                                    " info.Sleep.Intensity.#avg = :AsleepTime_avg," +
-                                    " info.Sleep.Calories.#avg = :Light_avg," +
+                                    UpdateExpression: "set info.Sleep.AwakeTime.#avg = :AwakeTime_avg," +
+                                    " info.Sleep.AsleepTime.#avg = :AsleepTime_avg," +
+                                    " info.Sleep.Light.#avg = :Light_avg," +
                                     " info.Sleep.REM.#avg = :REM_avg," +
                                     " info.Sleep.Deep.#avg = :Deep_avg," +
                                     " info.Sleep.#Duration.#avg = :Duration_avg",
 
                                     ExpressionAttributeValues: {
-                                        ":AwakeTime_avg": Averages.Count,
-                                        ":AsleepTime_avg": Averages.Intensity,
-                                        ":Light_avg": Averages.Calories,
+                                        ":AwakeTime_avg": Averages.AwakeTime,
+                                        ":AsleepTime_avg": Averages.AsleepTime,
+                                        ":Light_avg": Averages.Light,
                                         ":REM_avg": Averages.REM,
                                         ":Deep_avg": Averages.Deep,
                                         ":Duration_avg": Averages.Duration
@@ -880,9 +880,9 @@ router.post('/updateStats', function(req, res) {
                             } else { // create a new row as it doesn't exist
                                 logger.info("Creating new WeeklyStats row...");
                                 let json = api.newWeeklyStatsJson();
-                                json.Sleep.Count.avg = Averages.Count;
-                                json.Sleep.Intensity.avg = Averages.Intensity;
-                                json.Sleep.Calories.avg = Averages.Calories;
+                                json.Sleep.AwakeTime.avg = Averages.AwakeTime;
+                                json.Sleep.AsleepTime.avg = Averages.AsleepTime;
+                                json.Sleep.Light.avg = Averages.Light;
                                 json.Sleep.REM.avg = Averages.REM;
                                 json.Sleep.Deep.avg = Averages.Deep;
                                 json.Sleep.Duration.avg = Averages.Duration;
@@ -932,7 +932,7 @@ router.post('/updateStats', function(req, res) {
                     if (err) {
                         logger.error("Error reading Sleeps table. Error JSON:", JSON.stringify(err, null, 2));
                     } else {
-                        if (data.Count < 1) {
+                        if (data.AwakeTime < 1) {
                             return callback(null)
                         } else {
                             // use these so we don't include the null items in the averaging
@@ -1003,10 +1003,10 @@ router.post('/updateStats', function(req, res) {
                             }
 
                             // Calculate averages
-                            let Averages = {Count: 0, Intensity: 0, Calories: 0, REM: 0, Deep: 0, Duration: 0};
-                            Averages.Count = Math.ceil(AwakeTime.total / AwakeTime.totalCount);
-                            Averages.Intensity = Math.ceil(AsleepTime.total / AsleepTime.totalCount);
-                            Averages.Calories = Math.ceil(Light.total / Light.totalCount);
+                            let Averages = {AwakeTime: 0, AsleepTime: 0, Light: 0, REM: 0, Deep: 0, Duration: 0};
+                            Averages.AwakeTime = Math.ceil(AwakeTime.total / AwakeTime.totalCount);
+                            Averages.AsleepTime = Math.ceil(AsleepTime.total / AsleepTime.totalCount);
+                            Averages.Light = Math.ceil(Light.total / Light.totalCount);
                             Averages.REM = Math.ceil(REM.total / REM.totalCount);
                             Averages.Deep = Math.ceil(Deep.total / Deep.totalCount);
                             Averages.Duration = Math.ceil(Duration.total / Duration.totalCount);

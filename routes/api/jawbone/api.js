@@ -48,6 +48,10 @@ module.exports = {
                 DynamoDB: {
                     message : "",
                     error : false
+                },
+                Telegram: {
+                    message : "",
+                    error : false
                 }
             };
         return json;
@@ -106,6 +110,28 @@ module.exports = {
             }
         });
 
+    },
+
+    // pads a number with zeros. Taken from stack overflow
+    pad: function(n, width, z) {
+        z = z || '0';
+        n = n + '';
+        return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+    },
+
+    getbotDetails: function(userID, callback) {
+        const params = {
+            TableName: "User",
+            Key:{"user_id": userID}
+        };
+        docClient.get(params, function(err, data) {
+            if (err) {
+                logger.error("getbotAPI() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                const botDetails = { botAPI: data.Item.botAPI, chat_id: data.Item.chat_id};
+                return callback(botDetails);
+            }
+        });
     }
 };
 

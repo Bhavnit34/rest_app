@@ -4,6 +4,7 @@ var router = express.Router();
 var https = require('https');
 var api = require('./api');
 var loggerModule = require('../../logger');
+let request = require('request');
 // AWS Dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
@@ -125,7 +126,7 @@ router.get('/:userId/', function(req,res){
 
         docClient.query(params, function (err, data) {
             if (err) {
-                console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+                logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
                 //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
                 res.send(JSON.stringify(data, null, 2));
@@ -187,7 +188,6 @@ router.post('/updateSleeps', function(req,res_body){
         logger.debug('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
-            process.stdout.write(d);
             body += d;
         });
         res.on('end', function() {
@@ -235,13 +235,29 @@ router.post('/updateSleeps', function(req,res_body){
                     logger.info("All items added!");
                     returnJson.DynamoDB.message = "SUCCESS";
                     returnJson.DynamoDB.error = false;
-                    return res_body.status(200).send(returnJson);
                 } else {
                     logger.error(successCount + "/" + json_res.data.size + " items updated.");
                     returnJson.DynamoDB.message = successCount + "/" + json_res.data.size + " items updated. See logs.";
                     returnJson.DynamoDB.error = true;
-                    return res_body.status(500).send(returnJson);
                 }
+
+                const end = json_res.data.size - 1;
+                askAboutSleep(json_res.data.items[end], user_id, function(success, msg) {
+                    returnJson.Telegram.error = success;
+                    returnJson.Telegram.message = msg;
+
+                    let code = 200;
+                    if (returnJson.Telegram.error == true || returnJson.Telegram.error == true ||
+                        returnJson.Telegram.error == true) {
+                        code = 500;
+                    }
+
+                    return res_body.status(code).send(returnJson);
+
+
+                });
+
+                return;
             }
 
             // set unique table parameters
@@ -273,10 +289,135 @@ router.post('/updateSleeps', function(req,res_body){
         // start at the first index, the function will iterate over all indexes synchronously until complete and return.
         updateDB(0);
 
-    }
+    };
 
 
 });
+
+// function to determine if the user has recently woken up and if so, ask about their sleep using Telegram
+function askAboutSleep(sleep, userID, callback) {
+    logger.info("Checking if the user has recently awoken...");
+    let activeTime = 0;
+    const awakeTime  = new Date(sleep.details.awake_time * 1000);
+    const now = new Date();
+    const wokenHour = api.pad(awakeTime.getHours(),2);
+
+    // check that the user woke up at most 2 hours ago
+    if (now.getTime() - awakeTime.getTime() <= 7200000) {
+        // now check that the user has been recently active, to ensure they are actually awake
+        // we will check their recent Moves info for active time
+
+        let today = new Date();
+        today.setHours(0,0,0,0);
+        const query = "user_id = :user_id and timestamp_completed > :timestamp";
+        const attrValues = {
+            ":timestamp" : parseInt(today.getTime().toString().substr(0,10)),
+            ":user_id" : userID
+
+        };
+        // Retrieve data from db
+        const params = {
+            TableName: "Moves",
+            KeyConditionExpression: query,
+            ExpressionAttributeValues: attrValues,
+            Limit: 1
+        };
+
+
+        docClient.query(params, function (err, data) {
+            if (err) {
+                logger.error("askAboutSleep() : Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
+            } else {
+                const move = data;
+
+                // find correct hour to query active_time from
+                let hour = api.pad(now.getHours(),2).toString();
+                const date = api.pad(now.getDate(),2).toString();
+                let month = now.getMonth() + 1;
+                month = api.pad(month, 2).toString();
+                const year = now.getFullYear();
+
+                while (hour >= wokenHour) {
+                    const hourlyString = year + month + date + hour;
+
+                    // check it exists
+                    if (move.Items[0].info.details.hourly_totals[hourlyString]) {
+                        activeTime = move.Items[0].info.details.hourly_totals[hourlyString].active_time;
+                        break;
+                    } else {
+                        hour--;
+                    }
+                }
+
+                // now check active time; by this point the user woke up at most 2 hours ago
+                if (activeTime >= 100) {
+                    logger.info("User is currently active. Asking about their sleep...");
+                    // the user is awake and active. Ask about their sleep
+                    telegramRequest(userID, function(error, msg) {
+                        return callback(error, msg); // send the function result to the caller
+                    });
+                } else {
+                    const msg = "The user may not be awake. We won't ask them about their sleep";
+                    logger.info(msg);
+                    // We don't want to ask the user about their sleep at this point
+                    return callback(false, msg);
+                }
+            }
+        });
+
+    } else{
+        const msg = "The user has not recently awoken";
+        logger.info(msg);
+        // We don't want to ask the user about their sleep at this point
+        return callback(false, msg);
+    }
+
+}
+
+// send a message to the users chat
+function telegramRequest(userID, callback) {
+    api.getbotDetails(userID, function(botDetails) {
+        const now = new Date();
+        const day = api.pad(now.getDate(),2).toString();
+        let month = now.getMonth() + 1;
+        month = api.pad(month, 2).toString();
+        const year = now.getFullYear();
+        const date = year + "/" + month + "/" + day;
+
+        const json = { "chat_id" : botDetails.chat_id,
+            "text" : "I've noticed you're awake. How well did you sleep?",
+            "force_reply" : "True",
+            "reply_markup": {"inline_keyboard": [
+                [
+                    {"text" : "\uD83D\uDE01", "callback_data" : "{caller: updateSleeps, mood: 5, date: " + date + " }"},
+                    {"text" : "\uD83D\uDE0A", "callback_data" : "{caller: updateSleeps, mood: 4, date: " + date + "}"},
+                    {"text" : "\uD83D\uDE0C", "callback_data" : "{caller: updateSleeps, mood: 3, date: " + date + "}"},
+                    {"text" : "\uD83D\uDE14", "callback_data" : "{caller: updateSleeps, mood: 2, date: " + date + "}"},
+                    {"text" : "\uD83D\uDE2B", "callback_data" : "{caller: updateSleeps, mood: 1, date: " + date + "}"}
+                ]
+            ]}
+        };
+
+        request({
+            url: 'https://api.telegram.org/bot' + botDetails.botAPI + '/' + 'sendMessage',
+            method: "POST",
+            json: json,
+            headers: { "content-type" : "application/json"}
+        }, function(err, res, body){
+            let msg = "";
+            if(err) {
+                msg = 'telegramRequest :  problem with request: ' + err.message;
+                logger.error(msg);
+                return callback(true, msg);
+            }
+            msg = "A sleep request message has been sent to the user";
+            logger.info("telegramRequest : " + msg);
+            return callback(false, msg)
+        });
+    });
+
+}
+
 
 
 

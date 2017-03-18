@@ -73,7 +73,7 @@ module.exports = {
                     Duration: {avg: null}
                 },
                 Workouts: {
-                    Count: {avg: null},
+                    Count: {count: null},
                     Intensity: {avg: null},
                     Calories: {avg: null},
                     Time: {avg: null}

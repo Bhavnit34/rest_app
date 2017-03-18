@@ -276,7 +276,6 @@ router.post('/updateWorkouts', function(req,res_body){
 
 // function to calculate the stats from the whole table, if these values were lost
 function calculateInitialStats(userID, callback) {
-    let Count = {avg : 0, total : 0, totalCount : 0, avgCount : 0};
     let Intensity = {avg : 0, total : 0, totalCount : 0, avgCount : 0};
     let Calories = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
     let Time = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
@@ -299,20 +298,9 @@ function calculateInitialStats(userID, callback) {
             Calories.max = data.Items[0].info.details.calories;
             Time.max = data.Items[0].info.details.time;
             Time.min = data.Items[0].info.details.time;
+            let count = data.Items.length;
             for(let i = 0; i < data.Items.length; i++) {
                 // loop through each row and cumulate the average
-
-                // Count
-                let count = data.Items[i].info.details.count;
-                if (count != null) {
-                    Count.totalCount++;
-                    Count.total += count;
-                    if (count < Count.min) {
-                        Count.min = count;
-                    } else if (count > Count.max) {
-                        Count.max = count;
-                    }
-                }
 
                 // intensity
                 let intensity = data.Items[i].info.details.intensity;
@@ -348,7 +336,6 @@ function calculateInitialStats(userID, callback) {
 
 
             }
-            Count.avg = Math.ceil(Count.total / Count.totalCount);
             Intensity.avg = Math.ceil(Intensity.total / Intensity.totalCount);
             Calories.avg = Math.ceil(Calories.total / Calories.totalCount);
             Time.avg = Math.ceil(Time.total / Time.totalCount);
@@ -356,8 +343,7 @@ function calculateInitialStats(userID, callback) {
 
             let stats = {
                 Count : {
-                    avg: Count.avg,
-                    avg_count: Count.totalCount,
+                    count: count,
                     timestamp_updated: timestamp_updated
                 },
                 Intensity : {
@@ -393,7 +379,7 @@ router.post('/updateStats', function(req, res) {
     let user_id = "";
     let returnJson = api.newReturnJson();
     let token = "";
-    let newStats = {Count:{min:0, max:0, avg:0, avg_count: 0, timestamp_updated: 0},
+    let newStats = {Count:{count: 0, timestamp_updated: 0},
         Intensity:{min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0},
         Calories:{min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0},
         Time:{min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0}};
@@ -467,7 +453,7 @@ router.post('/updateStats', function(req, res) {
                                 // calculate new stats by taking into account the new values
                                 const row = data.Items;
                                 // use these so we don't include null Workouts in the averaging
-                                let Count = { total: 0, totalCount : 0};
+                                let count = data.Items.length;
                                 let Intensity = { total: 0, totalCount : 0};
                                 let Calories = { total: 0, totalCount : 0};
                                 let Time = { total: 0, totalCount : 0};
@@ -478,13 +464,6 @@ router.post('/updateStats', function(req, res) {
                                 newStats.Time.min = wo.Time.min;
 
                                 for (let i = 0; i < data.Items.length; i++) {
-                                    // count
-                                    let count = row[i].info.details.count;
-                                    if (count != null) {
-                                        Count.totalCount++;
-                                        Count.total += count;
-                                    }
-
                                     // intensity
                                     let intensity = row[i].info.details.intensity;
                                     if (intensity != null) {
@@ -518,9 +497,7 @@ router.post('/updateStats', function(req, res) {
 
                                 }
                                 // calculate new average by adding on the new values and dividng by (total + no. of new values)
-                                // Count
-                                newStats.Count.avg = Math.ceil(((wo.Count.avg * wo.Count.avg_count) + Count.total) / (wo.Count.avg_count + Count.totalCount));
-                                newStats.Count.avg_count = wo.Count.avg_count + Count.totalCount;
+                                newStats.Count.count = count;
                                 newStats.Count.timestamp_updated = Date.now().toString().substr(0, 10);
                                 // intensity
                                 newStats.Intensity.avg = Math.ceil(((wo.Intensity.avg * wo.Intensity.avg_count) + Intensity.total) / (wo.Intensity.avg_count + Intensity.totalCount));
@@ -557,9 +534,8 @@ router.post('/updateStats', function(req, res) {
             const params = {
                 TableName:"Stats",
                 Key:{"user_id": user_id},
-                UpdateExpression: "set info.Workouts.Count.#avg = :Count_avg," +
-                " info.Workouts.Count.avg_count = :Count_avg_count," +
-                " info.Workouts.Count.timestamp_updated = :Count_timestamp_updated," +
+                UpdateExpression: "set info.Workouts.#Count.#count = :Count_count," +
+                " info.Workouts.#Count.timestamp_updated = :Count_timestamp_updated," +
 
                 " info.Workouts.Intensity.#avg = :Intensity_avg," +
                 " info.Workouts.Intensity.avg_count = :Intensity_avg_count," +
@@ -571,15 +547,14 @@ router.post('/updateStats', function(req, res) {
                 " info.Workouts.Calories.avg_count = :Calories_avg_count," +
                 " info.Workouts.Calories.timestamp_updated = :Calories_timestamp_updated," +
 
-                " info.Workouts.Time.#avg = :Time_avg," +
-                " info.Workouts.Time.#min = :Time_min," +
-                " info.Workouts.Time.#max = :Time_max," +
-                " info.Workouts.Time.avg_count = :Time_avg_count," +
-                " info.Workouts.Time.timestamp_updated = :Time_timestamp_updated",
+                " info.Workouts.#Time.#avg = :Time_avg," +
+                " info.Workouts.#Time.#min = :Time_min," +
+                " info.Workouts.#Time.#max = :Time_max," +
+                " info.Workouts.#Time.avg_count = :Time_avg_count," +
+                " info.Workouts.#Time.timestamp_updated = :Time_timestamp_updated",
                 ExpressionAttributeValues:{
                     // count
-                    ":Count_avg_count": stats.Count.avg_count,
-                    ":Count_avg": stats.Count.avg,
+                    ":Count_count": stats.Count.count,
                     ":Count_timestamp_updated" : parseInt(stats.Count.timestamp_updated),
 
                     // intensity
@@ -605,7 +580,11 @@ router.post('/updateStats', function(req, res) {
                     "#avg": "avg",
                     "#min": "min",
                     "#max": "max",
+                    "#Count" : "Count",
+                    "#count" : "count",
+                    "#Time" : "Time"
                 },
+
                 ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
 
             };
@@ -677,19 +656,22 @@ router.post('/updateStats', function(req, res) {
                                         "user_id": user_id,
                                         "timestamp_weekStart" : date
                                     },
-                                    UpdateExpression: "set info.Workouts.Count.#avg = :Count_avg," +
+                                    UpdateExpression: "set info.Workouts.#Count.#count = :Count_count," +
                                     " info.Workouts.Intensity.#avg = :Intensity_avg," +
                                     " info.Workouts.Calories.#avg = :Calories_avg," +
-                                    " info.Workouts.Time.#avg = :Time_avg",
+                                    " info.Workouts.#Time.#avg = :Time_avg",
                                     ExpressionAttributeValues:{
-                                        ":Count_avg": Averages.Count,
+                                        ":Count_count": Averages.Count,
                                         ":Intensity_avg": Averages.Intensity,
                                         ":Calories_avg": Averages.Calories,
                                         ":Time_avg": Averages.Time
 
                                     },
                                     ExpressionAttributeNames: {
-                                        "#avg": "avg"
+                                        "#avg": "avg",
+                                        "#Count" : "Count",
+                                        "#count" : "count",
+                                        "#Time" : "Time"
                                     },
                                     ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
                                 };
@@ -710,7 +692,7 @@ router.post('/updateStats', function(req, res) {
                             } else { // create a new row as it doesn't exist
                                 logger.info("Creating new WeeklyStats row...");
                                 let json = api.newWeeklyStatsJson();
-                                json.Workouts.Count.avg = Averages.Count;
+                                json.Workouts.Count.count = Averages.Count;
                                 json.Workouts.Intensity.avg = Averages.Intensity;
                                 json.Workouts.Calories.avg = Averages.Calories;
                                 json.Workouts.Time.avg = Averages.Time;
@@ -764,7 +746,7 @@ router.post('/updateStats', function(req, res) {
                             return callback(null)
                         } else {
                             // use these so we don't include the null items in the averaging
-                            let Count = {total: 0, totalCount: 0};
+                            let count = data.Items.length;
                             let Intensity = {total: 0, totalCount: 0};
                             let Calories = {total: 0, totalCount: 0};
                             let Time = {total: 0, totalCount: 0};
@@ -772,13 +754,6 @@ router.post('/updateStats', function(req, res) {
                             for (let i = 0; i < data.Items.length; i++) {
                                 let workout = data.Items[i].info;
                                 if (workout == null) { continue ;}
-
-                                // count
-                                let count = workout.details.count;
-                                if (count != null) {
-                                    Count.total += count;
-                                    Count.totalCount++;
-                                }
 
                                 // intensity
                                 let intensity = workout.details.intensity;
@@ -803,7 +778,7 @@ router.post('/updateStats', function(req, res) {
 
                             // Calculate averages
                             let Averages = {Count: 0, Intensity: 0, Calories: 0, Time: 0};
-                            Averages.Count = Math.ceil(Count.total / Count.totalCount);
+                            Averages.Count = count;
                             Averages.Intensity = Math.ceil(Intensity.total / Intensity.totalCount);
                             Averages.Calories = Math.ceil(Calories.total / Calories.totalCount);
                             Averages.Time = Math.ceil(Time.total / Time.totalCount);

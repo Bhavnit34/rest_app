@@ -261,20 +261,26 @@ router.post('/updateSleeps', function(req,res_body){
             }
 
             // set unique table parameters
-            var date = json_res.data.items[i].date.toString();
-            var params = {
+            let date = json_res.data.items[i].date.toString();
+            const params = {
                 TableName: table,
-                Item: {
+                Key: {
                     "user_id": user_id,
                     "timestamp_completed": json_res.data.items[i].time_completed,
-                    "date": date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
-                    "info": json_res.data.items[i]
+                },
+                UpdateExpression: "set #date = :date, info = :info",
+                ExpressionAttributeValues: {
+                    ":date" : date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2),
+                    ":info": json_res.data.items[i]
+                },
+                ExpressionAttributeNames: {
+                    "#date" : "date"
                 }
             };
 
             // update table
             logger.info("Adding sleep " + (i+1) + " --> " +  date + " for user " + user_id);
-            docClient.put(params, function (err, data) {
+            docClient.update(params, function (err, data) {
                 if (err) {
                     logger.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
                     returnJson.DynamoDB[json_res.data.items[i].date.toString()] = JSON.stringify(err, null, 2);
@@ -294,84 +300,117 @@ router.post('/updateSleeps', function(req,res_body){
 
 });
 
+function checkMoodExists(userID, timestamp, callback) {
+    const params = {
+        TableName : "Sleeps",
+        Key: {
+            "user_id" : userID,
+            "timestamp_completed" : timestamp
+        }
+    };
+
+    docClient.get(params, function(err, data) {
+        if (err) {
+            logger.error("checkMoodExists() : Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
+        } else {
+            const sleep = data.Item;
+            if (sleep.mood != null){
+                logger.info("returning true");
+            } else {
+                logger.info("returning false");
+            }
+        }
+    });
+}
+
 // function to determine if the user has recently woken up and if so, ask about their sleep using Telegram
 function askAboutSleep(sleep, userID, callback) {
-    logger.info("Checking if the user has recently awoken...");
-    let activeTime = 0;
-    const awakeTime  = new Date(sleep.details.awake_time * 1000);
-    const now = new Date();
-    const wokenHour = api.pad(awakeTime.getHours(),2);
+    // first ensure the mood doesn't already exist
+    checkMoodExists(userID, sleep.time_completed, function(exists) {
+        if (exists) {
+            return callback(false, "The user has already given us their sleep summary");
+        } else {
+            ask();
+        }
+    });
+
+    let ask = function() {
+        logger.info("Checking if the user has recently awoken...");
+        let activeTime = 0;
+        const awakeTime = new Date(sleep.details.awake_time * 1000);
+        const now = new Date();
+        const wokenHour = api.pad(awakeTime.getHours(), 2);
 
 
-    logger.info("now: " + now.getTime() + " ---  awake: " + awakeTime.getTime());
-    // check that the user woke up at most 2 hours ago
-    if (now.getTime() - awakeTime.getTime() <= 7200000) {
-        // now check that the user has been recently active, to ensure they are actually awake
-        // we will check their recent Moves info for active time
+        // check that the user woke up at most 2 hours ago
+        if (now.getTime() - awakeTime.getTime() <= 7200000) {
+            // now check that the user has been recently active, to ensure they are actually awake
+            // we will check their recent Moves info for active time
 
-        let today = new Date();
-        today.setHours(0,0,0,0);
-        const query = "user_id = :user_id and timestamp_completed > :timestamp";
-        const attrValues = {
-            ":timestamp" : parseInt(today.getTime().toString().substr(0,10)),
-            ":user_id" : userID
+            let today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const query = "user_id = :user_id and timestamp_completed > :timestamp";
+            const attrValues = {
+                ":timestamp": parseInt(today.getTime().toString().substr(0, 10)),
+                ":user_id": userID
 
-        };
-        // Retrieve data from db
-        const params = {
-            TableName: "Moves",
-            KeyConditionExpression: query,
-            ExpressionAttributeValues: attrValues,
-            Limit: 1
-        };
+            };
+            // Retrieve data from db
+            const params = {
+                TableName: "Moves",
+                KeyConditionExpression: query,
+                ExpressionAttributeValues: attrValues,
+                Limit: 1
+            };
 
 
-        docClient.query(params, function (err, data) {
-            if (err) {
-                logger.error("askAboutSleep() : Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
-            } else {
-                const move = data;
+            docClient.query(params, function (err, data) {
+                if (err) {
+                    logger.error("askAboutSleep() : Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
+                } else {
+                    const move = data;
 
-                // find correct hour to query active_time from
-                let hour = api.pad(now.getHours(),2).toString();
-                const date = api.pad(now.getDate(),2).toString();
-                let month = now.getMonth() + 1;
-                month = api.pad(month, 2).toString();
-                const year = now.getFullYear();
+                    // find correct hour to query active_time from
+                    let hour = api.pad(now.getHours(), 2).toString();
+                    const date = api.pad(now.getDate(), 2).toString();
+                    let month = now.getMonth() + 1;
+                    month = api.pad(month, 2).toString();
+                    const year = now.getFullYear();
 
-                while (hour >= wokenHour) {
-                    hour = api.pad(hour,2).toString();
-                    const hourlyString = year + month + date + hour;
-                    // check it exists
-                    if (move.Items[0].info.details.hourly_totals[hourlyString]) {
-                        activeTime = move.Items[0].info.details.hourly_totals[hourlyString].active_time;
-                        break;
+                    while (hour >= wokenHour) {
+                        hour = api.pad(hour, 2).toString();
+                        const hourlyString = year + month + date + hour;
+                        // check it exists
+                        if (move.Items[0].info.details.hourly_totals[hourlyString]) {
+                            activeTime = move.Items[0].info.details.hourly_totals[hourlyString].active_time;
+                            break;
+                        } else {
+                            hour--;
+                        }
+                    }
+
+                    // now check active time; by this point the user woke up at most 2 hours ago
+                    if (activeTime >= 50) {
+                        logger.info("User is currently active. Asking about their sleep...");
+                        // the user is awake and active. Ask about their sleep
+                        telegramRequest(userID, function (error, msg) {
+                            return callback(error, msg); // send the function result to the caller
+                        });
                     } else {
-                        hour--;
+                        const msg = "The user may not be awake. We won't ask them about their sleep. (active time = " + activeTime + ")";
+                        logger.info(msg);
+                        // We don't want to ask the user about their sleep at this point
+                        return callback(false, msg);
                     }
                 }
+            });
 
-                // now check active time; by this point the user woke up at most 2 hours ago
-                if (activeTime >= 50) {
-                    logger.info("User is currently active. Asking about their sleep...");
-                    // the user is awake and active. Ask about their sleep
-                    telegramRequest(userID, function(error, msg) {
-                        return callback(error, msg); // send the function result to the caller
-                    });
-                } else {
-                    const msg = "The user may not be awake. We won't ask them about their sleep. (active time = " + activeTime + ")";
-                    logger.info(msg);
-                    // We don't want to ask the user about their sleep at this point
-                    return callback(false, msg);
-                }
-            }
-        });
-
-    } else{
-        const msg = "The user has not recently awoken. They last awoke at " + awakeTime.toString().split(" ").slice(0,5).join(" ");
-        logger.info(msg);
-        // We don't want to ask the user about their sleep at this point
-        return callback(false, msg);
+        } else {
+            const msg = "The user has not recently awoken. They last awoke at " + awakeTime.toString().split(" ").slice(0, 5).join(" ");
+            logger.info(msg);
+            // We don't want to ask the user about their sleep at this point
+            return callback(false, msg);
+        }
     }
 
 }
@@ -391,11 +430,11 @@ function telegramRequest(userID, callback) {
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : "\uD83D\uDE01", "callback_data" : "{caller: updateSleeps, mood: 5, date: " + date + " }"},
-                    {"text" : "\uD83D\uDE0A", "callback_data" : "{caller: updateSleeps, mood: 4, date: " + date + "}"},
-                    {"text" : "\uD83D\uDE0C", "callback_data" : "{caller: updateSleeps, mood: 3, date: " + date + "}"},
-                    {"text" : "\uD83D\uDE14", "callback_data" : "{caller: updateSleeps, mood: 2, date: " + date + "}"},
-                    {"text" : "\uD83D\uDE2B", "callback_data" : "{caller: updateSleeps, mood: 1, date: " + date + "}"}
+                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 5, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 4, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 3, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 2, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 1, \"date\": \"" + date + "\"}"}
                 ]
             ]}
         };

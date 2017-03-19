@@ -340,8 +340,8 @@ function askAboutSleep(sleep, userID, callback) {
                 const year = now.getFullYear();
 
                 while (hour >= wokenHour) {
+                    hour = api.pad(hour,2).toString();
                     const hourlyString = year + month + date + hour;
-
                     // check it exists
                     if (move.Items[0].info.details.hourly_totals[hourlyString]) {
                         activeTime = move.Items[0].info.details.hourly_totals[hourlyString].active_time;
@@ -352,14 +352,14 @@ function askAboutSleep(sleep, userID, callback) {
                 }
 
                 // now check active time; by this point the user woke up at most 2 hours ago
-                if (activeTime >= 100) {
+                if (activeTime >= 50) {
                     logger.info("User is currently active. Asking about their sleep...");
                     // the user is awake and active. Ask about their sleep
                     telegramRequest(userID, function(error, msg) {
                         return callback(error, msg); // send the function result to the caller
                     });
                 } else {
-                    const msg = "The user may not be awake. We won't ask them about their sleep. (active time = )" + activeTime;
+                    const msg = "The user may not be awake. We won't ask them about their sleep. (active time = " + activeTime + ")";
                     logger.info(msg);
                     // We don't want to ask the user about their sleep at this point
                     return callback(false, msg);
@@ -368,7 +368,7 @@ function askAboutSleep(sleep, userID, callback) {
         });
 
     } else{
-        const msg = "The user has not recently awoken";
+        const msg = "The user has not recently awoken. They last awoke at " + awakeTime.toString().split(" ").slice(0,5).join(" ");
         logger.info(msg);
         // We don't want to ask the user about their sleep at this point
         return callback(false, msg);

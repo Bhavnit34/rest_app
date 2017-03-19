@@ -463,12 +463,13 @@ function telegramRequest(userID, callback) {
 
 // function to calculate the stats from the whole table, if these values were lost
 function calculateInitialStats(userID, callback) {
-    let AwakeTime = {avg : 0, total : 0, totalCount : 0, avgCount : 0};
-    let AsleepTime = {avg : 0,  total : 0, totalCount : 0, avgCount : 0};
-    let Light = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
-    let REM = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
-    let Deep = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
-    let Duration = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
+    let AwakeDuration = {avg : 0, min: 0, max: 0, total : 0, totalCount : 0};
+    let AwakeTime = {avg : 0, total : 0, totalCount : 0};
+    let AsleepTime = {avg : 0,  total : 0, totalCount : 0};
+    let Light = {avg : 0, min : 0, max :0, total : 0, totalCount : 0};
+    let REM = {avg : 0, min : 0, max :0, total : 0, totalCount : 0};
+    let Deep = {avg : 0, min : 0, max :0, total : 0, totalCount : 0};
+    let Duration = {avg : 0, min : 0, max :0, total : 0, totalCount : 0};
 
     const table = "Sleeps";
     const params = {
@@ -483,6 +484,8 @@ function calculateInitialStats(userID, callback) {
             logger.error("Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
         } else {
             // proceed to calculating the stats
+            AwakeDuration.min = data.Items[1].info.details.asleep_time - data.Items[0].info.details.awake_time;
+            AwakeDuration.max = data.Items[1].info.details.asleep_time - data.Items[0].info.details.awake_time;
             Light.min = data.Items[0].info.details.light;
             Light.max = data.Items[0].info.details.light;
             REM.max = data.Items[0].info.details.rem;
@@ -526,6 +529,25 @@ function calculateInitialStats(userID, callback) {
                     if (asleep_time > 43200) {asleep_time = asleep_time - 86400;}
                     AsleepTime.totalCount++;
                     AsleepTime.total += asleep_time;
+                }
+
+                /*
+                 calculate time awake in seconds, by minusing the time awoken the next day from the time asleep of
+                 the current day.
+                 */
+                if ((i+1) <  data.Items.length) {
+                    let next_asleep = data.Items[i + 1].info.details.asleep_time;
+                    if (next_asleep != null && awake != null) {
+                        let awake_duration = next_asleep - awake;
+                        AwakeDuration.totalCount++;
+                        AwakeDuration.total += awake_duration;
+                        if (awake_duration < AwakeDuration.min) {
+                            AwakeDuration.min = awake_duration;
+                        } else if (awake_duration > AwakeDuration.max) {
+                            AwakeDuration.max = awake_duration;
+                        }
+                    }
+
                 }
 
                 // light
@@ -581,6 +603,7 @@ function calculateInitialStats(userID, callback) {
             }
 
             // calculate averages
+            AwakeDuration.avg = Math.ceil(AwakeDuration.total / AwakeDuration.totalCount);
             AwakeTime.avg = Math.ceil(AwakeTime.total / AwakeTime.totalCount);
             AsleepTime.avg = Math.ceil(AsleepTime.total / AsleepTime.totalCount);
             Light.avg = Math.ceil(Light.total / Light.totalCount);
@@ -591,6 +614,13 @@ function calculateInitialStats(userID, callback) {
             const timestamp_updated = Date.now().toString().substr(0,10);
 
             let stats = {
+                AwakeDuration: {
+                    avg: AwakeDuration.avg,
+                    min: AwakeDuration.min,
+                    max: AwakeDuration.max,
+                    avg_count: AwakeDuration.totalCount,
+                    timestamp_updated: timestamp_updated
+                },
                 AwakeTime : {
                     avg: AwakeTime.avg,
                     avg_count: AwakeTime.totalCount,
@@ -645,6 +675,7 @@ router.post('/updateStats', function(req, res) {
     let returnJson = api.newReturnJson();
     let token = "";
     let newStats = {
+        AwakeDuration : {avg : 0, min: 0, max: 0, avg_count : 0, timestamp_updated : 0},
         AwakeTime: {avg: 0, avg_count: 0, timestamp_updated: 0},
         AsleepTime: {avg: 0, avg_count: 0, timestamp_updated: 0},
         Light: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
@@ -724,6 +755,7 @@ router.post('/updateStats', function(req, res) {
                                 // calculate new stats by taking into account the new values
                                 const row = data.Items;
                                 // use these so we don't include null Sleeps in the averaging
+                                let AwakeDuration = {total: 0, totalCount: 0};
                                 let AwakeTime = {total: 0, totalCount: 0};
                                 let AsleepTime = {total: 0, totalCount: 0};
                                 let Light = {total: 0, totalCount: 0};
@@ -733,6 +765,8 @@ router.post('/updateStats', function(req, res) {
 
 
                                 // assign local min/max to what we currently have in the stats table
+                                newStats.AwakeDuration.max = sleep.AwakeDuration.max;
+                                newStats.AwakeDuration.min = sleep.AwakeDuration.min;
                                 newStats.Light.max = sleep.Light.max;
                                 newStats.Light.min = sleep.Light.min;
                                 newStats.REM.max = sleep.REM.max;
@@ -770,6 +804,22 @@ router.post('/updateStats', function(req, res) {
                                         if (asleep_time > 43200) {asleep_time = asleep_time - 86400;}
                                         AsleepTime.totalCount++;
                                         AsleepTime.total += asleep_time;
+                                    }
+
+                                    // Awake duration
+                                    if ((i+1) <  data.Items.length) {
+                                        let next_asleep = row[i + 1].info.details.asleep_time;
+                                        if (next_asleep != null && awake != null) {
+                                            let awake_duration = next_asleep - awake;
+                                            AwakeDuration.totalCount++;
+                                            AwakeDuration.total += awake_duration;
+                                            if (awake_duration < newStats.AwakeDuration.min) {
+                                                newStats.AwakeDuration.min = awake_duration;
+                                            } else if (awake_duration > newStats.AwakeDuration.max) {
+                                                newStats.AwakeDuration.max = awake_duration;
+                                            }
+                                        }
+
                                     }
 
                                     // light
@@ -824,6 +874,10 @@ router.post('/updateStats', function(req, res) {
 
                                 }
                                 // calculate new average by adding on the new values and dividng by (total + no. of new values)
+                                // awake duration
+                                newStats.AwakeDuration.avg = Math.ceil(((sleep.AwakeDuration.avg * sleep.AwakeDuration.avg_count) + AwakeDuration.total) / (sleep.AwakeDuration.avg_count + AwakeDuration.totalCount));
+                                newStats.AwakeDuration.avg_count = sleep.AwakeDuration.avg_count + AwakeDuration.totalCount;
+                                newStats.AwakeDuration.timestamp_updated = Date.now().toString().substr(0, 10);
                                 // awake time
                                 newStats.AwakeTime.avg = Math.ceil(((sleep.AwakeTime.avg * sleep.AwakeTime.avg_count) + AwakeTime.total) / (sleep.AwakeTime.avg_count + AwakeTime.totalCount));
                                 newStats.AwakeTime.avg_count = sleep.AwakeTime.avg_count + AwakeTime.totalCount;
@@ -879,6 +933,12 @@ router.post('/updateStats', function(req, res) {
                 " info.Sleep.AsleepTime.avg_count = :AsleepTime_avg_count," +
                 " info.Sleep.AsleepTime.timestamp_updated = :AsleepTime_timestamp_updated," +
 
+                " info.Sleep.AwakeDuration.#avg = :AwakeDuration_avg," +
+                " info.Sleep.AwakeDuration.#min = :AwakeDuration_min," +
+                " info.Sleep.AwakeDuration.#max = :AwakeDuration_max," +
+                " info.Sleep.AwakeDuration.avg_count = :AwakeDuration_avg_count," +
+                " info.Sleep.AwakeDuration.timestamp_updated = :AwakeDuration_timestamp_updated," +
+
                 " info.Sleep.Light.#avg = :Light_avg," +
                 " info.Sleep.Light.#min = :Light_min," +
                 " info.Sleep.Light.#max = :Light_max," +
@@ -914,6 +974,13 @@ router.post('/updateStats', function(req, res) {
                     ":AsleepTime_avg_count": stats.AsleepTime.avg_count,
                     ":AsleepTime_avg": stats.AsleepTime.avg,
                     ":AsleepTime_timestamp_updated": parseInt(stats.AsleepTime.timestamp_updated),
+
+                    // awake duration
+                    ":AwakeDuration_min": stats.AwakeDuration.min,
+                    ":AwakeDuration_max": stats.AwakeDuration.max,
+                    ":AwakeDuration_avg_count": stats.AwakeDuration.avg_count,
+                    ":AwakeDuration_avg": stats.AwakeDuration.avg,
+                    ":AwakeDuration_timestamp_updated": parseInt(stats.AwakeDuration.timestamp_updated),
 
                     // light
                     ":Light_min": stats.Light.min,
@@ -996,102 +1063,96 @@ router.post('/updateStats', function(req, res) {
                 if (err) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
-                    // to speed up checking for null, check for the string ":null" in the json
-                    let temp = JSON.stringify(data.Items[0].info.Sleep);
-                    let jsonString = temp.replace(/ /g, ''); // trim all whitespace
+                    returnWeeksAverage(user_id, date, function (Averages) {
 
-                    if (data.AwakeTime > 0 && jsonString.indexOf(":null") == -1) {
-                        // There already is an entry for this week
-                        const msg = "There already exists an entry for Sleep in week : " + dateString;
-                        logger.info(msg);
-                        return callback(true, msg);
-                    } else {
-                        returnWeeksAverage(user_id, date, function (Averages) {
-                            if (Averages == null) {
-                                return callback(false, "error in getting average for week starting: " + dateString);
-                            }
-                            // now store or update the calculated weekly average into the WeeklyStats table
-                            let params = {};
+                        if (Averages == null) {
+                            return callback(false, "error in getting average for week starting: " + dateString);
+                        }
+                        // now store or update the calculated weekly average into the WeeklyStats table
+                        let params = {};
 
-                            if (data.AwakeTime > 0) { // update the row that exists
-                                logger.info("Updating WeeklyStats row that already exists...");
+                        if (data.Count > 0) { // update the row that exists
+                            logger.info("Updating WeeklyStats row that already exists...");
 
-                                const params = {
-                                    TableName: table,
-                                    Key: {
-                                        "user_id": user_id,
-                                        "timestamp_weekStart": date
-                                    },
-                                    UpdateExpression: "set info.Sleep.AwakeTime.#avg = :AwakeTime_avg," +
-                                    " info.Sleep.AsleepTime.#avg = :AsleepTime_avg," +
-                                    " info.Sleep.Light.#avg = :Light_avg," +
-                                    " info.Sleep.REM.#avg = :REM_avg," +
-                                    " info.Sleep.Deep.#avg = :Deep_avg," +
-                                    " info.Sleep.#Duration.#avg = :Duration_avg",
+                            const params = {
+                                TableName: table,
+                                Key: {
+                                    "user_id": user_id,
+                                    "timestamp_weekStart": date
+                                },
+                                UpdateExpression: "set info.Sleep.AwakeTime.#avg = :AwakeTime_avg," +
+                                " info.Sleep.AsleepTime.#avg = :AsleepTime_avg," +
+                                " info.Sleep.AwakeDuration.#avg = :AwakeDuration_avg," +
+                                " info.Sleep.Light.#avg = :Light_avg," +
+                                " info.Sleep.REM.#avg = :REM_avg," +
+                                " info.Sleep.Deep.#avg = :Deep_avg," +
+                                " info.Sleep.#Duration.#avg = :Duration_avg",
 
-                                    ExpressionAttributeValues: {
-                                        ":AwakeTime_avg": Averages.AwakeTime,
-                                        ":AsleepTime_avg": Averages.AsleepTime,
-                                        ":Light_avg": Averages.Light,
-                                        ":REM_avg": Averages.REM,
-                                        ":Deep_avg": Averages.Deep,
-                                        ":Duration_avg": Averages.Duration
+                                ExpressionAttributeValues: {
+                                    ":AwakeTime_avg": Averages.AwakeTime,
+                                    ":AsleepTime_avg": Averages.AsleepTime,
+                                    ":AwakeDuration_avg": Averages.AwakeDuration,
+                                    ":Light_avg": Averages.Light,
+                                    ":REM_avg": Averages.REM,
+                                    ":Deep_avg": Averages.Deep,
+                                    ":Duration_avg": Averages.Duration
 
-                                    },
-                                    ExpressionAttributeNames: {
-                                        "#avg": "avg",
-                                        "#Duration" : "Duration"
-                                    },
-                                    ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
-                                };
+                                },
+                                ExpressionAttributeNames: {
+                                    "#avg": "avg",
+                                    "#Duration" : "Duration"
+                                },
+                                ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
+                            };
 
-                                // update dynamo table
-                                docClient.update(params, function (err, data) {
-                                    if (err) {
-                                        const msg = "Error updating WeeklyStats Sleep table. Error JSON: " + JSON.stringify(err, null, 2);
-                                        logger.error(msg);
-                                        return callback(false, msg);
-                                    } else {
-                                        const msg = "WeeklyStats row with week: " + dateString + " updated";
-                                        logger.info(msg);
-                                        return callback(true, msg);
-                                    }
-                                });
+                            // update dynamo table
+                            docClient.update(params, function (err, data) {
+                                if (err) {
+                                    const msg = "Error updating WeeklyStats Sleep table. Error JSON: " + JSON.stringify(err, null, 2);
+                                    logger.error(msg);
+                                    return callback(false, msg);
+                                } else {
+                                    const msg = "WeeklyStats row with week: " + dateString + " updated";
+                                    logger.info(msg);
+                                    return callback(true, msg);
+                                }
+                            });
 
-                            } else { // create a new row as it doesn't exist
-                                logger.info("Creating new WeeklyStats row...");
-                                let json = api.newWeeklyStatsJson();
-                                json.Sleep.AwakeTime.avg = Averages.AwakeTime;
-                                json.Sleep.AsleepTime.avg = Averages.AsleepTime;
-                                json.Sleep.Light.avg = Averages.Light;
-                                json.Sleep.REM.avg = Averages.REM;
-                                json.Sleep.Deep.avg = Averages.Deep;
-                                json.Sleep.Duration.avg = Averages.Duration;
-                                params = {
-                                    TableName: table,
-                                    Item: {
-                                        "user_id": user_id,
-                                        "timestamp_weekStart": date,
-                                        "info": json
-                                    }
-                                };
+                        } else { // create a new row as it doesn't exist
+                            logger.info("Creating new WeeklyStats row...");
+                            let json = api.newWeeklyStatsJson();
+                            json.Sleep.AwakeDuration.avg = Averages.AwakeDuration;
+                            json.Sleep.AwakeTime.avg = Averages.AwakeTime;
+                            json.Sleep.AsleepTime.avg = Averages.AsleepTime;
+                            json.Sleep.Light.avg = Averages.Light;
+                            json.Sleep.REM.avg = Averages.REM;
+                            json.Sleep.Deep.avg = Averages.Deep;
+                            json.Sleep.Duration.avg = Averages.Duration;
+                            params = {
+                                TableName: table,
+                                Item: {
+                                    "user_id": user_id,
+                                    "timestamp_weekStart": date,
+                                    "info": json
+                                }
+                            };
 
-                                docClient.put(params, function (err, data) {
-                                    let msg = "";
-                                    if (err) {
-                                        msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
-                                        logger.error(msg);
-                                        return callback(false, msg);
-                                    } else {
-                                        msg = "New row added to WeeklyStats for week starting: " + dateString;
-                                        logger.debug(msg);
-                                        return callback(true, msg);
-                                    }
-                                });
+                            docClient.put(params, function (err, data) {
+                                let msg = "";
+                                if (err) {
+                                    msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
+                                    logger.error(msg);
+                                    return callback(false, msg);
+                                } else {
+                                    msg = "New row added to WeeklyStats for week starting: " + dateString;
+                                    logger.debug(msg);
+                                    return callback(true, msg);
+                                }
+                            });
 
-                            }
-                        });
-                    }
+                        }
+                    });
+
 
                 }
             });
@@ -1117,6 +1178,7 @@ router.post('/updateStats', function(req, res) {
                             return callback(null)
                         } else {
                             // use these so we don't include the null items in the averaging
+                            let AwakeDuration = {total: 0, totalCount : 0};
                             let AwakeTime = {total: 0, totalCount: 0};
                             let AsleepTime = {total: 0, totalCount: 0};
                             let Light = {total: 0, totalCount: 0};
@@ -1158,6 +1220,17 @@ router.post('/updateStats', function(req, res) {
                                     AsleepTime.totalCount++;
                                 }
 
+                                // Awake duration
+                                if ((i+1) <  data.Items.length) {
+                                    let next_asleep = data.Items[i + 1].info.details.asleep_time;
+                                    if (next_asleep != null && awake != null) {
+                                        let awake_duration = next_asleep - awake;
+                                        AwakeDuration.totalCount++;
+                                        AwakeDuration.total += awake_duration;
+                                    }
+
+                                }
+
                                 // light sleep
                                 if (sleep.details.light != null) {
                                     Light.total += sleep.details.light;
@@ -1184,14 +1257,15 @@ router.post('/updateStats', function(req, res) {
                             }
 
                             // Calculate averages
-                            let Averages = {AwakeTime: 0, AsleepTime: 0, Light: 0, REM: 0, Deep: 0, Duration: 0};
+                            let Averages = {AwakeDuration: 0, AwakeTime: 0, AsleepTime: 0, Light: 0, REM: 0, Deep: 0, Duration: 0};
+                            Averages.AwakeDuration = Math.ceil(AwakeDuration.total / AwakeDuration.totalCount);
+                            if (AwakeDuration.totalCount == 0) { Averages.AwakeDuration = 0;}
                             Averages.AwakeTime = Math.ceil(AwakeTime.total / AwakeTime.totalCount);
                             Averages.AsleepTime = Math.ceil(AsleepTime.total / AsleepTime.totalCount);
                             Averages.Light = Math.ceil(Light.total / Light.totalCount);
                             Averages.REM = Math.ceil(REM.total / REM.totalCount);
                             Averages.Deep = Math.ceil(Deep.total / Deep.totalCount);
                             Averages.Duration = Math.ceil(Duration.total / Duration.totalCount);
-
                             return callback(Averages);
                         }
                     }

@@ -69,6 +69,7 @@ module.exports = {
                     Active_time: {avg: null}
                 },
                 Sleep: {
+                    AwakeDuration: {avg: null},
                     AsleepTime: {avg: null},
                     AwakeTime: {avg: null},
                     Light: {avg: null},

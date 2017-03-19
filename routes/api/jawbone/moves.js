@@ -232,14 +232,28 @@ router.post('/updateMoves', function(req,res_body){
                     logger.info("All items added!");
                     returnJson.DynamoDB.message = "SUCCESS";
                     returnJson.DynamoDB.error = false;
-                    return res_body.status(200).send(returnJson);
                 } else {
                     logger.error(successCount + "/" + json_res.data.size + " items updated.");
                     returnJson.DynamoDB.message = successCount + "/" + json_res.data.size + " items updated. See logs.";
                     returnJson.DynamoDB.error = true;
-                    return res_body.status(500).send(returnJson);
                 }
 
+                askAboutDay(json_res.data.items[0], user_id, function(success, msg) {
+                    returnJson.Telegram.error = success;
+                    returnJson.Telegram.message = msg;
+
+                    let code = 200;
+                    if (returnJson.Telegram.error == true || returnJson.Telegram.error == true ||
+                        returnJson.Telegram.error == true) {
+                        code = 500;
+                    }
+
+                    return res_body.status(code).send(returnJson);
+
+
+                });
+
+                return;
             }
 
             // set unique table parameters
@@ -344,6 +358,170 @@ function deleteOldData(table, date, user_id, updateCallback) {
 
 
 }
+
+
+function checkMoodExists(userID, timestamp, callback) {
+    const params = {
+        TableName : "Sleeps",
+        Key: {
+            "user_id" : userID,
+            "timestamp_completed" : timestamp
+        }
+    };
+
+    docClient.get(params, function(err, data) {
+        if (err) {
+            logger.error("checkMoodExists() : Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
+        } else {
+            const sleep = data.Item;
+            if (sleep.mood != null){
+                return callback(true);
+            } else {
+                return callback(false);
+            }
+        }
+    });
+}
+
+// function to determine if the user has recently woken up and if so, ask about their sleep using Telegram
+function askAboutDay(sleep, userID, callback) {
+    // first ensure the mood doesn't already exist
+    checkMoodExists(userID, sleep.time_completed, function(exists) {
+        if (exists) {
+            return callback(false, "The user has already given us their sleep summary");
+        } else {
+            ask();
+        }
+    });
+
+    let ask = function() {
+        logger.info("Checking if the user has recently awoken...");
+        let activeTime = 0;
+        const awakeTime = new Date(sleep.details.awake_time * 1000);
+        const now = new Date();
+        const wokenHour = api.pad(awakeTime.getHours(), 2);
+
+
+        // check that the user woke up at most 2 hours ago
+        if (now.getTime() - awakeTime.getTime() <= 7200000) {
+            // now check that the user has been recently active, to ensure they are actually awake
+            // we will check their recent Moves info for active time
+
+            let today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const query = "user_id = :user_id and timestamp_completed > :timestamp";
+            const attrValues = {
+                ":timestamp": parseInt(today.getTime().toString().substr(0, 10)),
+                ":user_id": userID
+
+            };
+            // Retrieve data from db
+            const params = {
+                TableName: "Moves",
+                KeyConditionExpression: query,
+                ExpressionAttributeValues: attrValues,
+                Limit: 1
+            };
+
+
+            docClient.query(params, function (err, data) {
+                if (err) {
+                    logger.error("askAboutSleep() : Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
+                } else {
+                    const move = data;
+
+                    // find correct hour to query active_time from
+                    let hour = api.pad(now.getHours(), 2).toString();
+                    const date = api.pad(now.getDate(), 2).toString();
+                    let month = now.getMonth() + 1;
+                    month = api.pad(month, 2).toString();
+                    const year = now.getFullYear();
+
+                    while (hour >= wokenHour) {
+                        hour = api.pad(hour, 2).toString();
+                        const hourlyString = year + month + date + hour;
+                        // check it exists
+                        if (move.Items[0].info.details.hourly_totals[hourlyString]) {
+                            activeTime = move.Items[0].info.details.hourly_totals[hourlyString].active_time;
+                            break;
+                        } else {
+                            hour--;
+                        }
+                    }
+
+                    // now check active time; by this point the user woke up at most 2 hours ago
+                    if (activeTime >= 50) {
+                        logger.info("User is currently active. Asking about their sleep...");
+                        // the user is awake and active. Ask about their sleep
+                        telegramRequest(userID, function (error, msg) {
+                            return callback(error, msg); // send the function result to the caller
+                        });
+                    } else {
+                        const msg = "The user may not be awake. We won't ask them about their sleep. (active time = " + activeTime + ")";
+                        logger.info(msg);
+                        // We don't want to ask the user about their sleep at this point
+                        return callback(false, msg);
+                    }
+                }
+            });
+
+        } else {
+            const msg = "The user has not recently awoken. They last awoke at " + awakeTime.toString().split(" ").slice(0, 5).join(" ");
+            logger.info(msg);
+            // We don't want to ask the user about their sleep at this point
+            return callback(false, msg);
+        }
+    }
+
+}
+
+// send a message to the users chat
+function telegramRequest(userID, callback) {
+    api.getbotDetails(userID, function(botDetails) {
+        const now = new Date();
+        const day = api.pad(now.getDate(),2).toString();
+        let month = now.getMonth() + 1;
+        month = api.pad(month, 2).toString();
+        const year = now.getFullYear();
+        const date = year + "/" + month + "/" + day;
+
+        const json = { "chat_id" : botDetails.chat_id,
+            "text" : "I've noticed you're awake. How well did you sleep?",
+            "force_reply" : "True",
+            "reply_markup": {"inline_keyboard": [
+                [
+                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 5, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 4, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 3, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 2, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 1, \"date\": \"" + date + "\"}"}
+                ]
+            ]}
+        };
+
+        request({
+            url: 'https://api.telegram.org/bot' + botDetails.botAPI + '/' + 'sendMessage',
+            method: "POST",
+            json: json,
+            headers: { "content-type" : "application/json"}
+        }, function(err, res, body){
+            let msg = "";
+            if(err) {
+                msg = 'telegramRequest :  problem with request: ' + err.message;
+                logger.error(msg);
+                return callback(true, msg);
+            }
+            msg = "A sleep request message has been sent to the user";
+            logger.info("telegramRequest : " + msg);
+            return callback(false, msg)
+        });
+    });
+
+}
+
+
+
+
 
 // function to calculate the stats from the whole table, if these values were lost
 function calculateInitialStats(userID, callback) {
@@ -759,101 +937,83 @@ router.post('/updateStats', function(req, res) {
                 if (err) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
-                    let needNewAverage = false;
-                    if (data.Count > 0) {
-                        // to speed up checking for null, check for the string ":null" in the json
-                        let temp = JSON.stringify(data.Items[0].info.Moves);
-                        let jsonString = temp.replace(/ /g, ''); // trim all whitespace
-
-                        if (jsonString.indexOf(":null") == -1) {
-                            // There already is an entry for this week
-                            const msg = "There already exists an entry for Moves in week : " + dateString;
-                            logger.info(msg);
-                            return callback(true, msg);
-                        } else {
-                            needNewAverage = true;
+                    returnWeeksAverage(user_id, date, function (Averages) {
+                        if (Averages == null) {
+                            return callback(false, "error in getting average for week starting: " + dateString)
                         }
-                    } else { needNewAverage = true;}
+                        // now store or update the calculated weekly average into the WeeklyStats table
+                        let params = {};
 
-                    if (needNewAverage) {
-                        returnWeeksAverage(user_id, date, function (Averages) {
-                            if (Averages == null) {
-                                return callback(false, "error in getting average for week starting: " + dateString)
-                            }
-                            // now store or update the calculated weekly average into the WeeklyStats table
-                            let params = {};
+                        if (data.Count > 0) { // update the row that exists
+                            logger.info("Updating WeeklyStats row that already exists...");
 
-                            if (data.Count > 0) { // update the row that exists
-                                logger.info("Updating WeeklyStats row that already exists...");
+                            const params = {
+                                TableName: table,
+                                Key: {
+                                    "user_id": user_id,
+                                    "timestamp_weekStart": date
+                                },
+                                UpdateExpression: "set info.Moves.Steps.#avg = :steps_avg," +
+                                "info.Moves.Distance.#avg = :distance_avg," +
+                                "info.Moves.Calories.#avg = :calories_avg," +
+                                "info.Moves.Active_time.#avg = :activeTime_avg",
+                                ExpressionAttributeValues: {
+                                    ":steps_avg": Averages.steps,
+                                    ":distance_avg": Averages.distance,
+                                    ":calories_avg": Averages.calories,
+                                    ":activeTime_avg": Averages.activeTime
 
-                                const params = {
-                                    TableName: table,
-                                    Key: {
-                                        "user_id": user_id,
-                                        "timestamp_weekStart": date
-                                    },
-                                    UpdateExpression: "set info.Moves.Steps.#avg = :steps_avg," +
-                                    "info.Moves.Distance.#avg = :distance_avg," +
-                                    "info.Moves.Calories.#avg = :calories_avg," +
-                                    "info.Moves.Active_time.#avg = :activeTime_avg",
-                                    ExpressionAttributeValues: {
-                                        ":steps_avg": Averages.steps,
-                                        ":distance_avg": Averages.distance,
-                                        ":calories_avg": Averages.calories,
-                                        ":activeTime_avg": Averages.activeTime
+                                },
+                                ExpressionAttributeNames: {
+                                    "#avg": "avg"
+                                },
+                                ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
+                            };
 
-                                    },
-                                    ExpressionAttributeNames: {
-                                        "#avg": "avg"
-                                    },
-                                    ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
-                                };
+                            // update dynamo table
+                            docClient.update(params, function (err, data) {
+                                if (err) {
+                                    const msg = "Error updating WeeklyStats Moves table. Error JSON: " + JSON.stringify(err, null, 2);
+                                    logger.error(msg);
+                                    return callback(false, msg);
+                                } else {
+                                    const msg = "WeeklyStats row with week: " + dateString + " updated";
+                                    logger.info(msg);
+                                    return callback(true, msg);
+                                }
+                            });
 
-                                // update dynamo table
-                                docClient.update(params, function (err, data) {
-                                    if (err) {
-                                        const msg = "Error updating WeeklyStats Moves table. Error JSON: " + JSON.stringify(err, null, 2);
-                                        logger.error(msg);
-                                        return callback(false, msg);
-                                    } else {
-                                        const msg = "WeeklyStats row with week: " + dateString + " updated";
-                                        logger.info(msg);
-                                        return callback(true, msg);
-                                    }
-                                });
+                        } else { // create a new row as it doesn't exist
+                            logger.info("Creating new WeeklyStats row...");
+                            let json = api.newWeeklyStatsJson();
+                            json.Moves.Steps.avg = Averages.steps;
+                            json.Moves.Distance.avg = Averages.distance;
+                            json.Moves.Calories.avg = Averages.calories;
+                            json.Moves.Active_time.avg = Averages.activeTime;
+                            params = {
+                                TableName: table,
+                                Item: {
+                                    "user_id": user_id,
+                                    "timestamp_weekStart": date,
+                                    "info": json
+                                }
+                            };
 
-                            } else { // create a new row as it doesn't exist
-                                logger.info("Creating new WeeklyStats row...");
-                                let json = api.newWeeklyStatsJson();
-                                json.Moves.Steps.avg = Averages.steps;
-                                json.Moves.Distance.avg = Averages.distance;
-                                json.Moves.Calories.avg = Averages.calories;
-                                json.Moves.Active_time.avg = Averages.activeTime;
-                                params = {
-                                    TableName: table,
-                                    Item: {
-                                        "user_id": user_id,
-                                        "timestamp_weekStart": date,
-                                        "info": json
-                                    }
-                                };
+                            docClient.put(params, function (err, data) {
+                                let msg = "";
+                                if (err) {
+                                    msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
+                                    logger.error(msg);
+                                    return callback(false, msg);
+                                } else {
+                                    msg = "New row added to WeeklyStats for week starting: " + dateString;
+                                    logger.debug(msg);
+                                    return callback(true, msg);
+                                }
+                            });
 
-                                docClient.put(params, function (err, data) {
-                                    let msg = "";
-                                    if (err) {
-                                        msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
-                                        logger.error(msg);
-                                        return callback(false, msg);
-                                    } else {
-                                        msg = "New row added to WeeklyStats for week starting: " + dateString;
-                                        logger.debug(msg);
-                                        return callback(true, msg);
-                                    }
-                                });
-
-                            }
-                        });
-                    }
+                        }
+                    });
 
 
                 }

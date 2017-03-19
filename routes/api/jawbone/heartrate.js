@@ -512,78 +512,71 @@ router.post('/updateStats', function(req, res) {
                 if (err) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
-                    if (data.AwakeTime > 0 && data.Items[0].info.HeartRate.avg != null) {
-                        // There already is an entry for this week
-                        const msg  = "There already exists an entry for HR in week : " + dateString;
-                        logger.info(msg);
-                        return callback(true, msg);
-                    } else {
-                        returnWeeksAverage(user_id, date, function(avg) {
-                            if(avg == null){return callback(false, "error in getting average for week starting: " + dateString)}
-                            // now store or update the calculated weekly average into the WeeklyStats table
-                            let params = {};
+                    returnWeeksAverage(user_id, date, function(avg) {
+                        if(avg == null){return callback(false, "error in getting average for week starting: " + dateString)}
+                        // now store or update the calculated weekly average into the WeeklyStats table
+                        let params = {};
 
-                            if (data.AwakeTime > 0) { // update the row that exists
-                                logger.info("Updating WeeklyStats row that already exists...");
+                        if (data.AwakeTime > 0) { // update the row that exists
+                            logger.info("Updating WeeklyStats row that already exists...");
 
-                                const params = {
-                                    TableName: table,
-                                    Key:{
-                                        "user_id": user_id,
-                                        "timestamp_weekStart" : date
-                                    },
-                                    UpdateExpression: "set info.HeartRate.#avg = :avg",
-                                    ExpressionAttributeValues:{
-                                        ":avg": avg,
-                                    },
-                                    ExpressionAttributeNames: {
-                                        "#avg": "avg"
-                                    },
-                                    ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
-                                };
+                            const params = {
+                                TableName: table,
+                                Key:{
+                                    "user_id": user_id,
+                                    "timestamp_weekStart" : date
+                                },
+                                UpdateExpression: "set info.HeartRate.#avg = :avg",
+                                ExpressionAttributeValues:{
+                                    ":avg": avg,
+                                },
+                                ExpressionAttributeNames: {
+                                    "#avg": "avg"
+                                },
+                                ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
+                            };
 
-                                // update dynamo table
-                                docClient.update(params, function(err, data) {
-                                    if (err) {
-                                        const msg = "Error updating WeeklyStats HR table. Error JSON: " + JSON.stringify(err, null, 2);
-                                        logger.error(msg);
-                                        return callback(false, msg);
-                                    } else {
-                                        const msg = "WeeklyStats row with week: " + dateString + " updated";
-                                        logger.info(msg);
-                                        return callback(true, msg);
-                                    }
-                                });
+                            // update dynamo table
+                            docClient.update(params, function(err, data) {
+                                if (err) {
+                                    const msg = "Error updating WeeklyStats HR table. Error JSON: " + JSON.stringify(err, null, 2);
+                                    logger.error(msg);
+                                    return callback(false, msg);
+                                } else {
+                                    const msg = "WeeklyStats row with week: " + dateString + " updated";
+                                    logger.info(msg);
+                                    return callback(true, msg);
+                                }
+                            });
 
-                            } else { // create a new row as it doesn't exist
-                                logger.info("Creating new WeeklyStats row...");
-                                let json = api.newWeeklyStatsJson();
-                                json.HeartRate.avg = avg;
-                                params = {
-                                    TableName: table,
-                                    Item: {
-                                        "user_id": user_id,
-                                        "timestamp_weekStart": date,
-                                        "info": json
-                                    }
-                                };
+                        } else { // create a new row as it doesn't exist
+                            logger.info("Creating new WeeklyStats row...");
+                            let json = api.newWeeklyStatsJson();
+                            json.HeartRate.avg = avg;
+                            params = {
+                                TableName: table,
+                                Item: {
+                                    "user_id": user_id,
+                                    "timestamp_weekStart": date,
+                                    "info": json
+                                }
+                            };
 
-                                docClient.put(params,function(err, data) {
-                                    let msg ="";
-                                    if (err) {
-                                        msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
-                                        logger.error(msg);
-                                        return callback(false, msg);
-                                    } else {
-                                        msg = "New row added to WeeklyStats for week starting: " + dateString;
-                                        logger.debug(msg);
-                                        return callback(true, msg);
-                                    }
-                                });
+                            docClient.put(params,function(err, data) {
+                                let msg ="";
+                                if (err) {
+                                    msg = "Error writing to " + table + " table. Error JSON: " + JSON.stringify(err, null, 2);
+                                    logger.error(msg);
+                                    return callback(false, msg);
+                                } else {
+                                    msg = "New row added to WeeklyStats for week starting: " + dateString;
+                                    logger.debug(msg);
+                                    return callback(true, msg);
+                                }
+                            });
 
-                            }
-                        });
-                    }
+                        }
+                    });
 
                 }
             });

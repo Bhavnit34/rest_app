@@ -302,6 +302,8 @@ function askAboutSleep(sleep, userID, callback) {
     const now = new Date();
     const wokenHour = api.pad(awakeTime.getHours(),2);
 
+
+    logger.info("now: " + now.getTime() + " ---  awake: " + awakeTime.getTime());
     // check that the user woke up at most 2 hours ago
     if (now.getTime() - awakeTime.getTime() <= 7200000) {
         // now check that the user has been recently active, to ensure they are actually awake
@@ -357,7 +359,7 @@ function askAboutSleep(sleep, userID, callback) {
                         return callback(error, msg); // send the function result to the caller
                     });
                 } else {
-                    const msg = "The user may not be awake. We won't ask them about their sleep";
+                    const msg = "The user may not be awake. We won't ask them about their sleep. (active time = )" + activeTime;
                     logger.info(msg);
                     // We don't want to ask the user about their sleep at this point
                     return callback(false, msg);

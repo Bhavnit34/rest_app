@@ -241,8 +241,7 @@ router.post('/updateSleeps', function(req,res_body){
                     returnJson.DynamoDB.error = true;
                 }
 
-                const end = json_res.data.size - 1;
-                askAboutSleep(json_res.data.items[end], user_id, function(success, msg) {
+                askAboutSleep(json_res.data.items[0], user_id, function(success, msg) {
                     returnJson.Telegram.error = success;
                     returnJson.Telegram.message = msg;
 

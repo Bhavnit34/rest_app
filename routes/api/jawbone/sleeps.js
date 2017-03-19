@@ -315,9 +315,9 @@ function checkMoodExists(userID, timestamp, callback) {
         } else {
             const sleep = data.Item;
             if (sleep.mood != null){
-                logger.info("returning true");
+                return callback(true);
             } else {
-                logger.info("returning false");
+                return callback(false);
             }
         }
     });

@@ -178,7 +178,6 @@ router.post('/updateMood', function(req,res_body){
         logger.debug('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
-            process.stdout.write(d);
             body += d;
         });
         res.on('end', function() {

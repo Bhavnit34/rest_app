@@ -456,7 +456,7 @@ function askAboutDay(move, userID, callback) {
                 let lastDate = new Date(awakeDate.getTime() + (3600000 * awake_hours));
 
 
-                if ((now.getHours() >= targetDate.getHours()) && (now.getHours() <= lastDate.getHours()) || true ) {
+                if ((now.getHours() >= targetDate.getHours()) && (now.getHours() <= lastDate.getHours())) {
                     // it is a suitable time to ask about the users day
                     // now we must check if they are not too busy, using recorded active time and steps
                     logger.info("We are in the right time slot");
@@ -484,7 +484,6 @@ function askAboutDay(move, userID, callback) {
 
                         // check current hour, and this is too recent, then check hour before
                         for (let i = 0; i < 2; i++) {
-                            logger.info("hourly_total = " + hourly_total);
                             if (move.details.hourly_totals.hasOwnProperty(hourly_total)) {
                                 active_time = move.details.hourly_totals[hourly_total].active_time;
                                 steps = move.details.hourly_totals[hourly_total].steps;

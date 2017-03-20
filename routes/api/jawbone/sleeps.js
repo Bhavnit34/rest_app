@@ -246,7 +246,7 @@ router.post('/updateSleeps', function(req,res_body){
                     returnJson.Telegram.message = msg;
 
                     let code = 200;
-                    if (returnJson.Telegram.error == true || returnJson.Telegram.error == true ||
+                    if (returnJson.DynamoDB.error == true || returnJson.Jawbone.error == true ||
                         returnJson.Telegram.error == true) {
                         code = 500;
                     }
@@ -300,6 +300,7 @@ router.post('/updateSleeps', function(req,res_body){
 });
 
 function checkMoodExists(userID, timestamp, callback) {
+    let msg = "";
     const params = {
         TableName : "Sleeps",
         Key: {
@@ -310,13 +311,15 @@ function checkMoodExists(userID, timestamp, callback) {
 
     docClient.get(params, function(err, data) {
         if (err) {
-            logger.error("checkMoodExists() : Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
+            msg = "checkMoodExists() : Unable to read Sleep item. Error JSON:" + JSON.stringify(err, null, 2);
+            logger.error(msg);
+            return callback(true, false);
         } else {
             const sleep = data.Item;
-            if (sleep.mood != null){
-                return callback(true);
+            if (sleep.hasOwnProperty('mood')){
+                return callback(false, true);
             } else {
-                return callback(false);
+                return callback(false, false);
             }
         }
     });
@@ -324,10 +327,18 @@ function checkMoodExists(userID, timestamp, callback) {
 
 // function to determine if the user has recently woken up and if so, ask about their sleep using Telegram
 function askAboutSleep(sleep, userID, callback) {
+    let msg = "";
     // first ensure the mood doesn't already exist
-    checkMoodExists(userID, sleep.time_completed, function(exists) {
+    checkMoodExists(userID, sleep.time_completed, function(error, exists) {
+        if (error) {
+            msg = "askAboutSleep() : could not get mood information from the sleep";
+            logger.error(msg);
+            return callback(true, msg);
+        }
         if (exists) {
-            return callback(false, "The user has already given us their sleep summary");
+            msg = "The user has already given us their sleep summary";
+            logger.info(msg);
+            return callback(false, msg);
         } else {
             ask();
         }
@@ -362,10 +373,12 @@ function askAboutSleep(sleep, userID, callback) {
                 Limit: 1
             };
 
-
+            // read the Moves table and find recent active time and steps
             docClient.query(params, function (err, data) {
                 if (err) {
-                    logger.error("askAboutSleep() : Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
+                    msg = "askAboutSleep() : Unable to read Moves item. Error JSON:" + JSON.stringify(err, null, 2);
+                    logger.error(msg);
+                    return callback(true, msg);
                 } else {
                     const move = data;
 
@@ -380,7 +393,7 @@ function askAboutSleep(sleep, userID, callback) {
                         hour = api.pad(hour, 2).toString();
                         const hourlyString = year + month + date + hour;
                         // check it exists
-                        if (move.Items[0].info.details.hourly_totals[hourlyString]) {
+                        if (move.Items[0].info.details.hourly_totals.hasOwnProperty(hourlyString)) {
                             activeTime = move.Items[0].info.details.hourly_totals[hourlyString].active_time;
                             break;
                         } else {
@@ -417,6 +430,8 @@ function askAboutSleep(sleep, userID, callback) {
 // send a message to the users chat
 function telegramRequest(userID, callback) {
     api.getbotDetails(userID, function(botDetails) {
+        if (botDetails == null) { return callback(false, "We don't have the users Telegram info. No message has been sent");}
+
         const now = new Date();
         const day = api.pad(now.getDate(),2).toString();
         let month = now.getMonth() + 1;
@@ -425,7 +440,7 @@ function telegramRequest(userID, callback) {
         const date = year + "/" + month + "/" + day;
 
         const json = { "chat_id" : botDetails.chat_id,
-            "text" : "I've noticed you're awake. How well did you sleep?",
+            "text" : "I've noticed you've started your day. How well did you sleep?",
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [

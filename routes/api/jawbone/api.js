@@ -38,6 +38,7 @@ module.exports = {
         return json;
     },
 
+    // used as a template for returning useful information to the caller
     newReturnJson: function() {
         let json =
             {
@@ -57,6 +58,7 @@ module.exports = {
         return json;
     },
 
+    // used as a template for storing WeeeklyStats data
     newWeeklyStatsJson: function() {
         let json =
             {
@@ -87,6 +89,7 @@ module.exports = {
         return json;
     },
 
+    // checks that the input token matches the one in the DB for a given user
     authenticateToken: function(token, user_id, callback_proceed) {
         var hashedToken = sha1(token);
         // Retrieve data from db
@@ -120,6 +123,7 @@ module.exports = {
         return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
     },
 
+    // returns the Telegram Bot API details needed to interact with a user via the Telegram chat
     getbotDetails: function(userID, callback) {
         const params = {
             TableName: "User",
@@ -129,8 +133,13 @@ module.exports = {
             if (err) {
                 logger.error("getbotAPI() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
-                const botDetails = { botAPI: data.Item.botAPI, chat_id: data.Item.chat_id};
-                return callback(botDetails);
+                if (data.Item.hasOwnProperty('botAPI') && data.Item.hasOwnProperty('chat_id')) {
+                    const botDetails = {botAPI: data.Item.botAPI, chat_id: data.Item.chat_id};
+                    return callback(botDetails);
+                } else {
+                    // we don't have their telegram details
+                    return callback(null);
+                }
             }
         });
     }

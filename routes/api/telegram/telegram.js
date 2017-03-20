@@ -72,9 +72,9 @@ router.post('/new-message', function(req,res_body) {
     if (json.hasOwnProperty('message')) {
         chat_id = json.message.chat.id;
         // handle message ID
-       if (msgIDExists(chat_id, json.message.message_id)) {
+        if (msgIDExists(chat_id, json.message.message_id)) {
             // avoid duplicate messages
-           logger.info("duplicate response detected");
+            logger.info("duplicate response detected");
             callbackMessage(chat_id, "I've already replied to that");
         }
 
@@ -154,8 +154,15 @@ function putSleepSummary(json, callback_data, callback) {
                         logger.error("Error updating mood for Sleep table. Error JSON:", JSON.stringify(err, null, 2));
                         return callback("error updating mood for Sleep for putSleepSummary");
                     } else {
-                        logger.info("The users mood has been added to their sleep!");
-                        return callback("Your mood has been added");
+                        // now mark the message in the chat as answered, giving their answer
+                        editMessageAsAnswered(json, callback_data.text, function(error, msg) {
+                            if (error) {
+                                logger.error(msg);
+                                return callback(msg);
+                            }
+                            logger.info("The users mood has been added to their day!");
+                            return callback("Your mood for the day has been added");
+                        });
                     }
                 });
 
@@ -180,7 +187,7 @@ function putDaySummary(json, callback_data, callback) {
             let dateString = date.getFullYear() + "/" + api.pad(date.getMonth(), 2).toString() + "/"
                 + api.pad(date.getDate(),2);
 
-        
+
             const params = {
                 TableName : "DailyMood",
                 Key: {"user_id": userID, "date" : dateString},
@@ -196,8 +203,15 @@ function putDaySummary(json, callback_data, callback) {
                     logger.error("Error updating DailyMood table. Error JSON:", JSON.stringify(err, null, 2));
                     return callback("error updating Sleep for putSleepSummary");
                 } else {
-                    logger.info("The users mood has been added to their sleep!");
-                    return callback("Your mood has been added");
+                    // now mark the message in the chat as answered, giving their answer
+                    editMessageAsAnswered(json, callback_data.text, function(error, msg) {
+                        if (error) {
+                            logger.error(msg);
+                            return callback(msg);
+                        }
+                        logger.info("The users mood has been added to their day!");
+                        return callback("Your mood for the day has been added");
+                    });
                 }
             });
 
@@ -223,6 +237,10 @@ function getUserID(chat_id, callback) {
             logger.error("putSleepSummary() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
             return callback(userID);
         } else {
+            logger.info(JSON.stringify(user, null, 4));
+            if (user.Count < 1) {
+                return callback(null);
+            }
             userID = user.Items[0].user_id;
             return callback(userID);
         }
@@ -238,12 +256,43 @@ function msgIDExists(chat_id, id) {
             return true;
         } else {
             IDs[chat_id].push(id);
+            logger.info(JSON.stringify(IDs, null, 2));
             return false;
         }
     } else {
-        IDs[chat_id] = [];
+        IDs[chat_id] = [id];
         return false;
     }
 }
+
+function editMessageAsAnswered(json_whole, answer, callback) {
+    let json = {};
+    if (json_whole.hasOwnProperty('callback_query')) {
+        json = json_whole.callback_query
+    } else if (!json_whole.hasOwnProperty('message')) {
+        // we don't understand the JSON
+        return callback(true, "editMessageAsAnswered() : Unknown json given, " + JSON.stringify(json_whole,null,4));
+    }
+    let chat_id = json.message.chat.id;
+    let msg_id = json.message.message_id;
+    let orig_text = json.message.text;
+
+
+    request({
+        url: 'https://api.telegram.org/bot' + botAPI + '/' + 'editMessageText',
+        method: "POST",
+        json: {
+            "chat_id": chat_id,
+            "message_id": msg_id,
+            "text": orig_text + " (You answered : ) " + answer
+        },
+        headers: { "content-type" : "application/json"}
+    }, function(err, res, body){
+        if(err) {logger.error('problem with request: ' + e.message);}
+        return res_body.status(200).send();
+    });
+}
+
+
 
 module.exports = router;

@@ -567,11 +567,11 @@ function telegramRequest(userID, callback) {
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 5, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 4, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 3, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 2, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 1, \"date\": \"" + date + "\"}"}
+                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"text\" : \"\uD83D\uDE01\", \"caller\": \"updateMoves\", \"mood\": 5, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"text\" : \"\uD83D\uDE0A\", \"caller\": \"updateMoves\", \"mood\": 4, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"text\" : \"\uD83D\uDE0C\", \"caller\": \"updateMoves\", \"mood\": 3, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"text\" : \"\uD83D\uDE14\", \"caller\": \"updateMoves\", \"mood\": 2, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"text\" : \"\uD83D\uDE2B\", \"caller\": \"updateMoves\", \"mood\": 1, \"date\": \"" + date + "\"}"}
                 ]
             ]}
         };

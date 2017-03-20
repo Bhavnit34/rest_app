@@ -444,11 +444,11 @@ function telegramRequest(userID, callback) {
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 5, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 4, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 3, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 2, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 1, \"date\": \"" + date + "\"}"}
+                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"text\" : \"\uD83D\uDE01\", \"caller\": \"updateSleeps\", \"mood\": 5, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"text\" : \"\uD83D\uDE0A\", \"caller\": \"updateSleeps\", \"mood\": 4, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"text\" : \"\uD83D\uDE0C\", \"caller\": \"updateSleeps\", \"mood\": 3, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"text\" : \"\uD83D\uDE14\", \"caller\": \"updateSleeps\", \"mood\": 2, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"text\" : \"\uD83D\uDE2B\", \"caller\": \"updateSleeps\", \"mood\": 1, \"date\": \"" + date + "\"}"}
                 ]
             ]}
         };

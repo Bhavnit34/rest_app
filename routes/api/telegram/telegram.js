@@ -173,16 +173,21 @@ function putSleepSummary(json, callback_data, callback) {
 }
 
 function getMsgID(chat_id) {
+    logger.info("IDs : " + JSON.stringify(IDs, null, 4));
+    let id = 0;
     // handle message ID
     if (IDs.hasOwnProperty(chat_id)) {
-        msgID = IDs.chat_id;
+        logger.info("getting " + chat_id + " ID as " + IDs[chat_id]);
+        id = IDs[chat_id];
     } else {
+        logger.info("no ID stored for " + chat_id + ". Adding it at 0");
         IDs[chat_id] = 0;
     }
+    return id;
 }
 
 function setMsgID(chat_id, id) {
-    Ids[chat_id] = id;
+    IDs[chat_id] = id;
 }
 
 module.exports = router;

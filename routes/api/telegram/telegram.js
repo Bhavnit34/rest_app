@@ -14,6 +14,7 @@ const docClient = new AWS.DynamoDB.DocumentClient();
 const logger = loggerModule.getLogger();
 const botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
 let msgID = 0;
+let IDs = {};
 
 router.post('/new-message', function(req,res_body) {
     let json = req.body;
@@ -49,7 +50,7 @@ router.post('/new-message', function(req,res_body) {
             if(err) {logger.error('problem with request: ' + e.message);}
             return res_body.status(200).send();
         });
-    }
+    };
 
 
 
@@ -58,15 +59,16 @@ router.post('/new-message', function(req,res_body) {
         chat_id = json.callback_query.message.chat.id;
 
         // handle message ID
+        msgID = getMsgID(chat_id);
         if (msgID == 0) {
-            msgID = json.callback_query.message.message_id;
+            setMsgID(chat_id, json.callback_query.message.message_id);
         } else if (json.callback_query.message.message_id <= msgID) {
             // avoid duplicate messages
             logger.info("duplicate response detected");
             callbackQuery("I've already replied to that");
             return;
         } else {
-            msgID = json.callback_query.message.message_id
+            setMsgID(chat_id, json.callback_query.message.message_id);
         }
     }
 
@@ -74,12 +76,14 @@ router.post('/new-message', function(req,res_body) {
     if (json.message) {
         chat_id = json.message.chat.id;
         // handle message ID
+        msgID = getMsgID(chat_id);
         if (msgID == 0) {
-            msgID = json.message.message_id;
+            setMsgID(chat_id, json.message.message_id);
         } else if (json.message.message_id <= msgID) {
             // avoid duplicate messages
             callbackMessage(chat_id, "I've already replied to that");
         } else {
+            setMsgID(chat_id, json.message.message_id);
             msgID = json.message.message_id
         }
 
@@ -166,6 +170,19 @@ function putSleepSummary(json, callback_data, callback) {
 
         }
     });
+}
+
+function getMsgID(chat_id) {
+    // handle message ID
+    if (IDs.hasOwnProperty(chat_id)) {
+        msgID = IDs.chat_id;
+    } else {
+        IDs[chat_id] = 0;
+    }
+}
+
+function setMsgID(chat_id, id) {
+    Ids[chat_id] = id;
 }
 
 module.exports = router;

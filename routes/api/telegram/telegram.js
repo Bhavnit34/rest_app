@@ -60,16 +60,11 @@ router.post('/new-message', function(req,res_body) {
         chat_id = json.callback_query.message.chat.id;
 
         // handle message ID
-        msgID = getMsgID(chat_id);
-        if (msgID == 0) {
-            setMsgID(chat_id, json.callback_query.message.message_id);
-        } else if (json.callback_query.message.message_id <= msgID) {
+        if (msgIDExists(chat_id, json.callback_query.message.message_id)) {
             // avoid duplicate messages
             logger.info("duplicate response detected");
             callbackQuery("I've already replied to that");
             return;
-        } else {
-            setMsgID(chat_id, json.callback_query.message.message_id);
         }
     }
 
@@ -77,15 +72,10 @@ router.post('/new-message', function(req,res_body) {
     if (json.hasOwnProperty('message')) {
         chat_id = json.message.chat.id;
         // handle message ID
-        msgID = getMsgID(chat_id);
-        if (msgID == 0) {
-            setMsgID(chat_id, json.message.message_id);
-        } else if (json.message.message_id <= msgID) {
+       if (msgIDExists(chat_id, json.message.message_id)) {
             // avoid duplicate messages
+           logger.info("duplicate response detected");
             callbackMessage(chat_id, "I've already replied to that");
-        } else {
-            setMsgID(chat_id, json.message.message_id);
-            msgID = json.message.message_id
         }
 
     }
@@ -241,19 +231,19 @@ function getUserID(chat_id, callback) {
 
 
 
-function getMsgID(chat_id) {
-    let id = 0;
+function msgIDExists(chat_id, id) {
     // handle message ID
     if (IDs.hasOwnProperty(chat_id)) {
-        id = IDs[chat_id];
+        if (IDs[chat_id].indexOf(id) > -1) {
+            return true;
+        } else {
+            IDs[chat_id].push(id);
+            return false;
+        }
     } else {
-        IDs[chat_id] = 0;
+        IDs[chat_id] = [];
+        return false;
     }
-    return id;
-}
-
-function setMsgID(chat_id, id) {
-    IDs[chat_id] = id;
 }
 
 module.exports = router;

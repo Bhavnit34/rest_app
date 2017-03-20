@@ -266,6 +266,11 @@ function msgIDExists(chat_id, id) {
 }
 
 function editMessageAsAnswered(json_whole, answer, callback) {
+    if (answer == null) {
+        logger.info("editMessageAsAnswered() : Answer was undefined. Skipping editting msg");
+        return callback(false, null)
+    }
+
     let json = {};
     if (json_whole.hasOwnProperty('callback_query')) {
         json = json_whole.callback_query
@@ -284,12 +289,16 @@ function editMessageAsAnswered(json_whole, answer, callback) {
         json: {
             "chat_id": chat_id,
             "message_id": msg_id,
-            "text": orig_text + " (You answered : ) " + answer
+            "text": orig_text + " (You answered : " + answer + " )"
         },
         headers: { "content-type" : "application/json"}
     }, function(err, res, body){
-        if(err) {logger.error('problem with request: ' + e.message);}
-        return res_body.status(200).send();
+        if(err) {
+            const msg = 'problem with request: ' + e.message;
+            logger.error(msg);
+            return callback(true, msg);
+        }
+        return callback(false, null)
     });
 }
 

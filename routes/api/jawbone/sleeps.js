@@ -513,6 +513,90 @@ function calculateInitialStats(userID, callback) {
             for(let i = 0; i < data.Items.length; i++) {
                 // loop through each row and cumulate the average
 
+
+                /*
+                 Calculate time awake in seconds, by minusing the time awoken the next day from the time asleep of
+                 the current day. We can't always take the next index, as we might not have all days.
+                 */
+
+                /*
+                Check that the user didn't nap during the day, as this will affect the average.
+                We do this by using the longest sleep of a day as the one for the average.
+                 */
+
+                // if the day before is the same as this one, then we have already checked it. continue
+                if ((i-1) >= 0) {
+                  if (data.Items[i-1].date == data.Items[i].date) {
+                      continue;
+                  }
+                }
+
+
+                let allSleepsForThisDayComplete = false;
+                let j = 1;
+                // initalise longest sleep to the current sleep row
+                let max_sleep = data.Items[i].info.details.duration;
+                let index_max_sleep = i;
+
+                // loop over the next days and store the local max duration of these days
+                // once the next day is not the current one, continue
+                while ((i+j) < data.Items.length && allSleepsForThisDayComplete == false) {
+                    let row = data.Items[i];
+                    let next_row = data.Items[i + j];
+
+                    if (row.date == next_row.date) {
+                        // the next row has the same date as today
+                        if(next_row.info.details.duration > max_sleep) {
+                            // the next row (same day) has a longer sleep
+                            max_sleep = next_row.info.details.duration;
+                            index_max_sleep = (i+j);
+                        }
+                        j++;
+                    } else {
+                        // the next day is a different one. end the loop
+                        allSleepsForThisDayComplete = true;
+                    }
+                }
+
+                /*
+                Now use the index of the row with longest sleep that we found as the users awake time.
+                The next sleep time minus this awake time is the duration. We must find out if the next day
+                is stored in the DB. If not then we can't work out the duration.
+                */
+
+                // work out if there is a sleep for the next day
+                let SleepDurationAvailable = false;
+                j = 1;
+                while ((index_max_sleep+j) < data.Items.length) {
+                    let row = data.Items[index_max_sleep];
+                    let next_row = data.Items[index_max_sleep + j];
+                    if (row.date == next_row.date) {
+                        // skip this day, it's the same as today
+                        j++;
+                    } else {
+                        let next_day = new Date((row.timestamp_completed * 1000) + 86400000);
+                        let next_row_day = new Date(next_row.timestamp_completed * 1000);
+                        if ((next_day.getDate() == next_row_day.getDate())
+                        && (next_day.getMonth() == next_row_day.getMonth())
+                        && (next_day.getFullYear() == next_row_day.getFullYear())) {
+                            // the next row (thats not today) is at most 1 day later i.e. We can calculate the awake hours
+                            SleepDurationAvailable = true;
+                            break;
+                        } else {
+                            SleepDurationAvailable = false;
+                            break;
+                        }
+                    }
+
+                }
+
+                /*
+                From here on we shall use index_max_sleep as the sleep to calculate from. Any successive rows with the same
+                date will be skipped
+                 */
+                i = index_max_sleep;
+                let index_next_day = i+j; // this is the index we found to be the next day
+
                 /*
                  calculate time in seconds, we don't want the whole timestamp
                  for this we are using the time relative to midnight (i.e. 00:00)
@@ -546,12 +630,12 @@ function calculateInitialStats(userID, callback) {
                     AsleepTime.total += asleep_time;
                 }
 
-                /*
-                 calculate time awake in seconds, by minusing the time awoken the next day from the time asleep of
-                 the current day.
-                 */
-                if ((i+1) <  data.Items.length) {
-                    let next_asleep = data.Items[i + 1].info.details.asleep_time;
+
+
+                // We are now working out the sleep duration from the row with the longest sleep
+                if (SleepDurationAvailable && ((i) <  data.Items.length)) {
+                    let next_row = data.Items[index_next_day];
+                    let next_asleep = next_row.info.details.asleep_time;
                     if (next_asleep != null && awake != null) {
                         let awake_duration = next_asleep - awake;
                         AwakeDuration.totalCount++;
@@ -612,7 +696,6 @@ function calculateInitialStats(userID, callback) {
                         Duration.max = duration;
                     }
                 }
-
 
 
             }
@@ -760,6 +843,7 @@ router.post('/updateStats', function(req, res) {
                             }
                         };
 
+                        // query Sleeps for new rows
                         docClient.query(params, function (err, data) {
                             if (err) {
                                 logger.error("Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
@@ -791,24 +875,114 @@ router.post('/updateStats', function(req, res) {
                                 newStats.Duration.max = sleep.Duration.max;
                                 newStats.Duration.min = sleep.Duration.min;
 
-                                for (let i = 0; i < data.Items.length; i++) {
+                                for(let i = 0; i < data.Items.length; i++) {
+                                    // loop through each row and cumulate the average
+
+
+                                    /*
+                                     Calculate time awake in seconds, by minusing the time awoken the next day from the time asleep of
+                                     the current day. We can't always take the next index, as we might not have all days.
+                                     */
+
+                                    /*
+                                     Check that the user didn't nap during the day, as this will affect the average.
+                                     We do this by using the longest sleep of a day as the one for the average.
+                                     */
+
+                                    // if the day before is the same as this one, then we have already checked it. continue
+                                    if ((i-1) >= 0) {
+                                        if (data.Items[i-1].date == data.Items[i].date) {
+                                            continue;
+                                        }
+                                    }
+
+
+                                    let allSleepsForThisDayComplete = false;
+                                    let j = 1;
+                                    // initalise longest sleep to the current sleep row
+                                    let max_sleep = data.Items[i].info.details.duration;
+                                    let index_max_sleep = i;
+
+                                    // loop over the next days and store the local max duration of these days
+                                    // once the next day is not the current one, continue
+                                    while ((i+j) < data.Items.length && allSleepsForThisDayComplete == false) {
+                                        let row = data.Items[i];
+                                        let next_row = data.Items[i + j];
+
+                                        if (row.date == next_row.date) {
+                                            // the next row has the same date as today
+                                            if(next_row.info.details.duration > max_sleep) {
+                                                // the next row (same day) has a longer sleep
+                                                max_sleep = next_row.info.details.duration;
+                                                index_max_sleep = (i+j);
+                                            }
+                                            j++;
+                                        } else {
+                                            // the next day is a different one. end the loop
+                                            allSleepsForThisDayComplete = true;
+                                        }
+                                    }
+
+                                    /*
+                                     Now use the index of the row with longest sleep that we found as the users awake time.
+                                     The next sleep time minus this awake time is the duration. We must find out if the next day
+                                     is stored in the DB. If not then we can't work out the duration.
+                                     */
+
+                                    // work out if there is a sleep for the next day
+                                    let SleepDurationAvailable = false;
+                                    j = 1;
+                                    while ((index_max_sleep+j) < data.Items.length) {
+                                        let row = data.Items[index_max_sleep];
+                                        let next_row = data.Items[index_max_sleep + j];
+                                        if (row.date == next_row.date) {
+                                            // skip this day, it's the same as today
+                                            j++;
+                                        } else {
+                                            let next_day = new Date((row.timestamp_completed * 1000) + 86400000);
+                                            let next_row_day = new Date(next_row.timestamp_completed * 1000);
+                                            if ((next_day.getDate() == next_row_day.getDate())
+                                                && (next_day.getMonth() == next_row_day.getMonth())
+                                                && (next_day.getFullYear() == next_row_day.getFullYear())) {
+                                                // the next row (thats not today) is at most 1 day later i.e. We can calculate the awake hours
+                                                SleepDurationAvailable = true;
+                                                break;
+                                            } else {
+                                                SleepDurationAvailable = false;
+                                                break;
+                                            }
+                                        }
+
+                                    }
+
+                                    /*
+                                     From here on we shall use index_max_sleep as the sleep to calculate from. Any successive rows with the same
+                                     date will be skipped
+                                     */
+                                    i = index_max_sleep;
+                                    let index_next_day = i+j; // this is the index we found to be the next day
+
+                                    /*
+                                     calculate time in seconds, we don't want the whole timestamp
+                                     for this we are using the time relative to midnight (i.e. 00:00)
+                                     23:00 would be -3600 seconds, 01:00 would be +3600
+                                     */
+
                                     // awake time
-                                    let awake = row[i].info.details.awake_time;
+                                    let awake = row.Items[i].info.details.awake_time;
                                     if (awake != null) {
-                                        // calculate time in seconds, we don't want the whole timestamp
                                         let awakeDate = new Date(awake * 1000);
                                         let awakeStart = new Date(awake * 1000);
                                         awakeStart.setHours(0,0,0,0);
                                         let awake_time = ((awakeDate.getTime() - awakeStart.getTime()) / 1000);
                                         // i.e. make negative if later than midday, by deducting from midnight
                                         if (awake_time > 43200) {awake_time = awake_time - 86400;}
-
                                         AwakeTime.totalCount++;
                                         AwakeTime.total += awake_time;
                                     }
 
                                     // asleep time
-                                    let asleep = row[i].info.details.asleep_time;
+                                    let asleep = row.Items[i].info.details.asleep_time;
                                     if (asleep != null) {
                                         // calculate time in seconds, we don't want the whole timestamp
                                         let asleepDate = new Date(asleep * 1000);
@@ -821,73 +995,77 @@ router.post('/updateStats', function(req, res) {
                                         AsleepTime.total += asleep_time;
                                     }
 
-                                    // Awake duration
-                                    if ((i+1) <  data.Items.length) {
-                                        let next_asleep = row[i + 1].info.details.asleep_time;
+
+
+                                    // We are now working out the sleep duration from the row with the longest sleep
+                                    if (SleepDurationAvailable && ((i) <  data.Items.length)) {
+                                        let next_row = row.Items[index_next_day];
+                                        let next_asleep = next_row.info.details.asleep_time;
                                         if (next_asleep != null && awake != null) {
                                             let awake_duration = next_asleep - awake;
                                             AwakeDuration.totalCount++;
                                             AwakeDuration.total += awake_duration;
-                                            if (awake_duration < newStats.AwakeDuration.min) {
-                                                newStats.AwakeDuration.min = awake_duration;
-                                            } else if (awake_duration > newStats.AwakeDuration.max) {
-                                                newStats.AwakeDuration.max = awake_duration;
+                                            if (awake_duration < AwakeDuration.min) {
+                                                AwakeDuration.min = awake_duration;
+                                            } else if (awake_duration > AwakeDuration.max) {
+                                                AwakeDuration.max = awake_duration;
                                             }
                                         }
 
                                     }
 
                                     // light
-                                    let light = row[i].info.details.light;
+                                    let light = row.Items[i].info.details.light;
                                     if (light != null) {
                                         Light.totalCount++;
-                                        if (light > newStats.Light.max) {
-                                            newStats.Light.max = light;
-                                        } else if (light < newStats.Light.min) {
-                                            newStats.Light.min = light;
-                                        }
                                         Light.total += light;
+                                        if (light < Light.min) {
+                                            Light.min = light;
+                                        } else if (light > Light.max) {
+                                            Light.max = light;
+                                        }
                                     }
 
-                                    // REM
-                                    let rem = row[i].info.details.rem;
+                                    // rem
+                                    let rem = row.Items[i].info.details.rem;
                                     if (rem != null) {
                                         REM.totalCount++;
-                                        if (rem > newStats.REM.max) {
-                                            newStats.REM.max = rem;
-                                        } else if (rem < newStats.REM.min) {
-                                            newStats.REM.min = rem;
-                                        }
                                         REM.total += rem;
+                                        if (rem < REM.min) {
+                                            REM.min = rem;
+                                        } else if (rem > REM.max) {
+                                            REM.max = rem;
+                                        }
                                     }
 
-                                    // Deep
-                                    let deep = row[i].info.details.sound;
+                                    // deep
+                                    let deep = row.Items[i].info.details.sound;
                                     if (deep != null) {
                                         Deep.totalCount++;
-                                        if (deep > newStats.Deep.max) {
-                                            newStats.Deep.max = deep;
-                                        } else if (deep < newStats.Deep.min) {
-                                            newStats.Deep.min = deep;
-                                        }
                                         Deep.total += deep;
+                                        if (deep < Deep.min) {
+                                            Deep.min = deep;
+                                        } else if (deep > Deep.max) {
+                                            Deep.max = deep;
+                                        }
                                     }
 
-                                    // Duration
-                                    let duration = row[i].info.details.duration;
+                                    // duration
+                                    let duration = row.Items[i].info.details.duration;
                                     if (duration != null) {
                                         Duration.totalCount++;
-                                        if (duration > newStats.Duration.max) {
-                                            newStats.Duration.max = duration;
-                                        } else if (duration < newStats.Duration.min) {
-                                            newStats.Duration.min = duration;
-                                        }
                                         Duration.total += duration;
+                                        if (duration < Duration.min) {
+                                            Duration.min = duration;
+                                        } else if (duration > Duration.max) {
+                                            Duration.max = duration;
+                                        }
                                     }
-
 
 
                                 }
+
+
                                 // calculate new average by adding on the new values and dividng by (total + no. of new values)
                                 // awake duration
                                 newStats.AwakeDuration.avg = Math.ceil(((sleep.AwakeDuration.avg * sleep.AwakeDuration.avg_count) + AwakeDuration.total) / (sleep.AwakeDuration.avg_count + AwakeDuration.totalCount));
@@ -1185,6 +1363,7 @@ router.post('/updateStats', function(req, res) {
                     Limit: 7
                 };
 
+                // query 7 days from the given start date
                 docClient.query(params, function(err, data) {
                     if (err) {
                         logger.error("Error reading Sleeps table. Error JSON:", JSON.stringify(err, null, 2));
@@ -1201,27 +1380,115 @@ router.post('/updateStats', function(req, res) {
                             let Deep = {total: 0, totalCount: 0};
                             let Duration = {total: 0, totalCount: 0};
 
-                            for (let i = 0; i < data.Items.length; i++) {
-                                let sleep = data.Items[i].info;
-                                if (sleep == null) { continue ;}
+
+
+                            for(let i = 0; i < data.Items.length; i++) {
+                                // loop through each row and cumulate the average
+
+
+                                /*
+                                 Calculate time awake in seconds, by minusing the time awoken the next day from the time asleep of
+                                 the current day. We can't always take the next index, as we might not have all days.
+                                 */
+
+                                /*
+                                 Check that the user didn't nap during the day, as this will affect the average.
+                                 We do this by using the longest sleep of a day as the one for the average.
+                                 */
+
+                                // if the day before is the same as this one, then we have already checked it. continue
+                                if ((i-1) >= 0) {
+                                    if (data.Items[i-1].date == data.Items[i].date) {
+                                        continue;
+                                    }
+                                }
+
+                                let allSleepsForThisDayComplete = false;
+                                let j = 1;
+                                // initalise longest sleep to the current sleep row
+                                let max_sleep = data.Items[i].info.details.duration;
+                                let index_max_sleep = i;
+
+                                // loop over the next days and store the local max duration of these days
+                                // once the next day is not the current one, continue
+                                while ((i+j) < data.Items.length && allSleepsForThisDayComplete == false) {
+                                    let row = data.Items[i];
+                                    let next_row = data.Items[i + j];
+
+                                    if (row.date == next_row.date) {
+                                        // the next row has the same date as today
+                                        if(next_row.info.details.duration > max_sleep) {
+                                            // the next row (same day) has a longer sleep
+                                            max_sleep = next_row.info.details.duration;
+                                            index_max_sleep = (i+j);
+                                        }
+                                        j++;
+                                    } else {
+                                        // the next day is a different one. end the loop
+                                        allSleepsForThisDayComplete = true;
+                                    }
+                                }
+
+                                /*
+                                 Now use the index of the row with longest sleep that we found as the users awake time.
+                                 The next sleep time minus this awake time is the duration. We must find out if the next day
+                                 is stored in the DB. If not then we can't work out the duration.
+                                 */
+
+                                // work out if there is a sleep for the next day
+                                let SleepDurationAvailable = false;
+                                j = 1;
+                                while ((index_max_sleep+j) < data.Items.length) {
+                                    let row = data.Items[index_max_sleep];
+                                    let next_row = data.Items[index_max_sleep + j];
+                                    if (row.date == next_row.date) {
+                                        // skip this day, it's the same as today
+                                        j++;
+                                    } else {
+                                        let next_day = new Date((row.timestamp_completed * 1000) + 86400000);
+                                        let next_row_day = new Date(next_row.timestamp_completed * 1000);
+                                        if ((next_day.getDate() == next_row_day.getDate())
+                                            && (next_day.getMonth() == next_row_day.getMonth())
+                                            && (next_day.getFullYear() == next_row_day.getFullYear())) {
+                                            // the next row (thats not today) is at most 1 day later i.e. We can calculate the awake hours
+                                            SleepDurationAvailable = true;
+                                            break;
+                                        } else {
+                                            SleepDurationAvailable = false;
+                                            break;
+                                        }
+                                    }
+
+                                }
+
+                                /*
+                                 From here on we shall use index_max_sleep as the sleep to calculate from. Any successive rows with the same
+                                 date will be skipped
+                                 */
+                                i = index_max_sleep;
+                                let index_next_day = i+j; // this is the index we found to be the next day
+
+                                /*
+                                 calculate time in seconds, we don't want the whole timestamp
+                                 for this we are using the time relative to midnight (i.e. 00:00)
+                                 23:00 would be -3600 seconds, 01:00 would be +3600
+                                 */
 
                                 // awake time
-                                let awake = sleep.details.awake_time;
+                                let awake = data.Items[i].info.details.awake_time;
                                 if (awake != null) {
-                                    // calculate time in seconds, we don't want the whole timestamp
                                     let awakeDate = new Date(awake * 1000);
                                     let awakeStart = new Date(awake * 1000);
                                     awakeStart.setHours(0,0,0,0);
                                     let awake_time = ((awakeDate.getTime() - awakeStart.getTime()) / 1000);
                                     // i.e. make negative if later than midday, by deducting from midnight
                                     if (awake_time > 43200) {awake_time = awake_time - 86400;}
-
-                                    AwakeTime.total += awake_time;
                                     AwakeTime.totalCount++;
+                                    AwakeTime.total += awake_time;
                                 }
 
                                 // asleep time
-                                let asleep = sleep.details.asleep_time;
+                                let asleep = data.Items[i].info.details.asleep_time;
                                 if (asleep != null) {
                                     // calculate time in seconds, we don't want the whole timestamp
                                     let asleepDate = new Date(asleep * 1000);
@@ -1230,14 +1497,15 @@ router.post('/updateStats', function(req, res) {
                                     let asleep_time = ((asleepDate.getTime() - asleepStart.getTime()) / 1000);
                                     // i.e. make negative if later than midday, by deducting from midnight
                                     if (asleep_time > 43200) {asleep_time = asleep_time - 86400;}
-
-                                    AsleepTime.total += asleep_time;
                                     AsleepTime.totalCount++;
+                                    AsleepTime.total += asleep_time;
                                 }
 
-                                // Awake duration
-                                if ((i+1) <  data.Items.length) {
-                                    let next_asleep = data.Items[i + 1].info.details.asleep_time;
+
+                                // We are now working out the sleep duration from the row with the longest sleep
+                                if (SleepDurationAvailable && ((i) <  data.Items.length)) {
+                                    let next_row = data.Items[index_next_day];
+                                    let next_asleep = next_row.info.details.asleep_time;
                                     if (next_asleep != null && awake != null) {
                                         let awake_duration = next_asleep - awake;
                                         AwakeDuration.totalCount++;
@@ -1246,29 +1514,35 @@ router.post('/updateStats', function(req, res) {
 
                                 }
 
-                                // light sleep
-                                if (sleep.details.light != null) {
-                                    Light.total += sleep.details.light;
+                                // light
+                                let light = data.Items[i].info.details.light;
+                                if (light != null) {
                                     Light.totalCount++;
+                                    Light.total += light;
                                 }
 
-                                // REM sleep
-                                if (sleep.details.rem != null) {
-                                    REM.total += sleep.details.rem;
+                                // rem
+                                let rem = data.Items[i].info.details.rem;
+                                if (rem != null) {
                                     REM.totalCount++;
+                                    REM.total += rem;
                                 }
 
-                                // Deep sleep
-                                if (sleep.details.sound != null) {
-                                    Deep.total += sleep.details.sound;
+                                // deep
+                                let deep = data.Items[i].info.details.sound;
+                                if (deep != null) {
                                     Deep.totalCount++;
+                                    Deep.total += deep;
                                 }
 
-                                // Duration
-                                if (sleep.details.duration != null) {
-                                    Duration.total += sleep.details.duration;
+                                // duration
+                                let duration = data.Items[i].info.details.duration;
+                                if (duration != null) {
                                     Duration.totalCount++;
+                                    Duration.total += duration;
                                 }
+
+
                             }
 
                             // Calculate averages

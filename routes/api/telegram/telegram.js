@@ -4,6 +4,7 @@ let router = express.Router();
 let https = require('https');
 let request = require('request');
 let loggerModule = require('../../logger');
+var api = require('../jawbone/api');
 // AWS Dependencies
 let AWS = require('aws-sdk');
 AWS.config.update({
@@ -54,7 +55,7 @@ router.post('/new-message', function(req,res_body) {
 
 
 
-    if (json.callback_query) {
+    if (json.hasOwnProperty('callback_query')) {
         callbackID = json.callback_query.id;
         chat_id = json.callback_query.message.chat.id;
 
@@ -73,7 +74,7 @@ router.post('/new-message', function(req,res_body) {
     }
 
 
-    if (json.message) {
+    if (json.hasOwnProperty('message')) {
         chat_id = json.message.chat.id;
         // handle message ID
         msgID = getMsgID(chat_id);
@@ -90,20 +91,29 @@ router.post('/new-message', function(req,res_body) {
     }
 
 
-
-
-
     // handle function for a message reply
     let callback_data = null;
     if (callbackID) {
         callback_data = JSON.parse(json.callback_query.data);
-        if (callback_data.caller == "updateSleeps") {
-            putSleepSummary(json, callback_data, function(msg) {
-                logger.info("replying from putSleepSummary")
-                callbackQuery(msg);
-            });
-        } else {
-            callbackQuery("success");
+        const caller = callback_data.caller.toString();
+        switch (caller) {
+            case "updateSleeps": {
+                putSleepSummary(json, callback_data, function(msg) {
+                    logger.info("replying from putSleepSummary");
+                    callbackQuery(msg);
+                });
+                break;
+            }
+            case "updateMoves": {
+                logger.info("calling putDaySummary...")
+                putDaySummary(json, callback_data, function(msg) {
+                    logger.info("replying from putDaySummary");
+                    callbackQuery(msg);
+
+                });
+                break;
+            }
+            default : callbackQuery("nothing to do");
         }
     } else {
         callbackMessage(chat_id, "nothing to do");
@@ -114,19 +124,13 @@ router.post('/new-message', function(req,res_body) {
 function putSleepSummary(json, callback_data, callback) {
     let userID = "";
     let timestamp  = 0;
-    const params = {
-        TableName : "User",
-        FilterExpression: "chat_id = :chat_id",
-        ExpressionAttributeValues: {":chat_id" : json.callback_query.message.chat.id}
-    };
-
     // Find the userID, given the chat_id
-    docClient.scan(params, function (err, user) {
-        if (err) {
+    getUserID(json.callback_query.message.chat.id, function (user) {
+        if (!user) {
             logger.error("putSleepSummary() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
             return callback("error finding User for putSleepSummary");
         } else {
-            userID = user.Items[0].user_id;
+            userID = user;
 
             const params = {
                 TableName : "Sleeps",
@@ -157,8 +161,8 @@ function putSleepSummary(json, callback_data, callback) {
                 // Update the Sleep row to include the mood
                 docClient.update(params, function (err, data) {
                     if (err) {
-                        logger.error("Error updating Stats Sleep table. Error JSON:", JSON.stringify(err, null, 2));
-                        return callback("error updating Sleep for putSleepSummary");
+                        logger.error("Error updating mood for Sleep table. Error JSON:", JSON.stringify(err, null, 2));
+                        return callback("error updating mood for Sleep for putSleepSummary");
                     } else {
                         logger.info("The users mood has been added to their sleep!");
                         return callback("Your mood has been added");
@@ -172,15 +176,77 @@ function putSleepSummary(json, callback_data, callback) {
     });
 }
 
+
+function putDaySummary(json, callback_data, callback) {
+    let userID = "";
+    let date  = new Date(json.callback_query.message.date * 1000);
+    // Find the userID, given the chat_id
+    getUserID(json.callback_query.message.chat.id, function (user) {
+        if (!user) {
+            logger.error("putSleepSummary() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
+            return callback("error finding User for putSleepSummary");
+        } else {
+            userID = user;
+            let dateString = date.getFullYear() + "/" + api.pad(date.getMonth(), 2).toString() + "/"
+                + api.pad(date.getDate(),2);
+
+        
+            const params = {
+                TableName : "DailyMood",
+                Key: {"user_id": userID, "date" : dateString},
+                UpdateExpression: "set mood = :mood",
+                ExpressionAttributeValues: {":mood" : callback_data.mood},
+                ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
+            };
+
+
+            // Update the Sleep row to include the mood
+            docClient.update(params, function (err, data) {
+                if (err) {
+                    logger.error("Error updating DailyMood table. Error JSON:", JSON.stringify(err, null, 2));
+                    return callback("error updating Sleep for putSleepSummary");
+                } else {
+                    logger.info("The users mood has been added to their sleep!");
+                    return callback("Your mood has been added");
+                }
+            });
+
+
+
+        }
+    });
+}
+
+
+
+function getUserID(chat_id, callback) {
+    let userID = null;
+    const params = {
+        TableName : "User",
+        FilterExpression: "chat_id = :chat_id",
+        ExpressionAttributeValues: {":chat_id" : chat_id}
+    };
+
+    // Find the userID, given the chat_id
+    docClient.scan(params, function (err, user) {
+        if (err) {
+            logger.error("putSleepSummary() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
+            return callback(userID);
+        } else {
+            userID = user.Items[0].user_id;
+            return callback(userID);
+        }
+    });
+}
+
+
+
 function getMsgID(chat_id) {
-    logger.info("IDs : " + JSON.stringify(IDs, null, 4));
     let id = 0;
     // handle message ID
     if (IDs.hasOwnProperty(chat_id)) {
-        logger.info("getting " + chat_id + " ID as " + IDs[chat_id]);
         id = IDs[chat_id];
     } else {
-        logger.info("no ID stored for " + chat_id + ". Adding it at 0");
         IDs[chat_id] = 0;
     }
     return id;

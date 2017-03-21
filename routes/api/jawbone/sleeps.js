@@ -611,10 +611,10 @@ function calculateInitialStats(userID, callback) {
                 // loop over the next days and store the local max duration of these days
                 // once the next day is not the current one, continue
                 while ((i+j) < data.Items.length && allSleepsForThisDayComplete == false) {
-                    let row = data.Items[i];
+                    let this_row = data.Items[i];
                     let next_row = data.Items[i + j];
 
-                    if (row.date == next_row.date) {
+                    if (this_row.date == next_row.date) {
                         // the next row has the same date as today
                         if(next_row.info.details.duration > max_sleep) {
                             // the next row (same day) has a longer sleep
@@ -638,9 +638,9 @@ function calculateInitialStats(userID, callback) {
                 let SleepDurationAvailable = false;
                 j = 1;
                 while ((index_max_sleep+j) < data.Items.length) {
-                    let row = data.Items[index_max_sleep];
+                    let this_row = data.Items[index_max_sleep];
                     let next_row = data.Items[index_max_sleep + j];
-                    if (row.date == next_row.date) {
+                    if (this_row.date == next_row.date) {
                         // skip this day, it's the same as today
                         j++;
                     } else {
@@ -918,11 +918,11 @@ router.post('/updateStats', function(req, res) {
                             if (err) {
                                 logger.error("Unable to read Sleep item. Error JSON:", JSON.stringify(err, null, 2));
                             } else {
-                                if (data.AwakeTime == 0) {
+                                if (data.Count == 0) {
                                     return callback(null);
                                 } // don't write any stats if there are no updates
                                 // calculate new stats by taking into account the new values
-                                const row = data.Items;
+                                let row = data.Items;
                                 // use these so we don't include null Sleeps in the averaging
                                 let AwakeDuration = {total: 0, totalCount: 0};
                                 let AwakeTime = {total: 0, totalCount: 0};
@@ -976,10 +976,10 @@ router.post('/updateStats', function(req, res) {
                                     // loop over the next days and store the local max duration of these days
                                     // once the next day is not the current one, continue
                                     while ((i+j) < data.Items.length && allSleepsForThisDayComplete == false) {
-                                        let row = data.Items[i];
+                                        let this_row = data.Items[i];
                                         let next_row = data.Items[i + j];
 
-                                        if (row.date == next_row.date) {
+                                        if (this_row.date == next_row.date) {
                                             // the next row has the same date as today
                                             if(next_row.info.details.duration > max_sleep) {
                                                 // the next row (same day) has a longer sleep
@@ -1003,9 +1003,9 @@ router.post('/updateStats', function(req, res) {
                                     let SleepDurationAvailable = false;
                                     j = 1;
                                     while ((index_max_sleep+j) < data.Items.length) {
-                                        let row = data.Items[index_max_sleep];
+                                        let this_row = data.Items[index_max_sleep];
                                         let next_row = data.Items[index_max_sleep + j];
-                                        if (row.date == next_row.date) {
+                                        if (this_row.date == this_row.date) {
                                             // skip this day, it's the same as today
                                             j++;
                                         } else {
@@ -1039,7 +1039,7 @@ router.post('/updateStats', function(req, res) {
                                      */
 
                                     // awake time
-                                    let awake = row.Items[i].info.details.awake_time;
+                                    let awake = row[i].info.details.awake_time;
                                     if (awake != null) {
                                         let awakeDate = new Date(awake * 1000);
                                         let awakeStart = new Date(awake * 1000);
@@ -1052,7 +1052,7 @@ router.post('/updateStats', function(req, res) {
                                     }
 
                                     // asleep time
-                                    let asleep = row.Items[i].info.details.asleep_time;
+                                    let asleep = row[i].info.details.asleep_time;
                                     if (asleep != null) {
                                         // calculate time in seconds, we don't want the whole timestamp
                                         let asleepDate = new Date(asleep * 1000);
@@ -1069,7 +1069,7 @@ router.post('/updateStats', function(req, res) {
 
                                     // We are now working out the sleep duration from the row with the longest sleep
                                     if (SleepDurationAvailable && ((i) <  data.Items.length)) {
-                                        let next_row = row.Items[index_next_day];
+                                        let next_row = row[index_next_day];
                                         let next_asleep = next_row.info.details.asleep_time;
                                         if (next_asleep != null && awake != null) {
                                             let awake_duration = next_asleep - awake;
@@ -1085,7 +1085,7 @@ router.post('/updateStats', function(req, res) {
                                     }
 
                                     // light
-                                    let light = row.Items[i].info.details.light;
+                                    let light = row[i].info.details.light;
                                     if (light != null) {
                                         Light.totalCount++;
                                         Light.total += light;
@@ -1097,7 +1097,7 @@ router.post('/updateStats', function(req, res) {
                                     }
 
                                     // rem
-                                    let rem = row.Items[i].info.details.rem;
+                                    let rem = row[i].info.details.rem;
                                     if (rem != null) {
                                         REM.totalCount++;
                                         REM.total += rem;
@@ -1109,7 +1109,7 @@ router.post('/updateStats', function(req, res) {
                                     }
 
                                     // deep
-                                    let deep = row.Items[i].info.details.sound;
+                                    let deep = row[i].info.details.sound;
                                     if (deep != null) {
                                         Deep.totalCount++;
                                         Deep.total += deep;
@@ -1121,7 +1121,7 @@ router.post('/updateStats', function(req, res) {
                                     }
 
                                     // duration
-                                    let duration = row.Items[i].info.details.duration;
+                                    let duration = row[i].info.details.duration;
                                     if (duration != null) {
                                         Duration.totalCount++;
                                         Duration.total += duration;
@@ -1438,7 +1438,7 @@ router.post('/updateStats', function(req, res) {
                     if (err) {
                         logger.error("Error reading Sleeps table. Error JSON:", JSON.stringify(err, null, 2));
                     } else {
-                        if (data.AwakeTime < 1) {
+                        if (data.Count < 1) {
                             return callback(null)
                         } else {
                             // use these so we don't include the null items in the averaging
@@ -1509,13 +1509,13 @@ router.post('/updateStats', function(req, res) {
                                 let SleepDurationAvailable = false;
                                 j = 1;
                                 while ((index_max_sleep+j) < data.Items.length) {
-                                    let row = data.Items[index_max_sleep];
+                                    let this_row = data.Items[index_max_sleep];
                                     let next_row = data.Items[index_max_sleep + j];
-                                    if (row.date == next_row.date) {
+                                    if (this_row.date == next_row.date) {
                                         // skip this day, it's the same as today
                                         j++;
                                     } else {
-                                        let next_day = new Date((row.timestamp_completed * 1000) + 86400000);
+                                        let next_day = new Date((this_row.timestamp_completed * 1000) + 86400000);
                                         let next_row_day = new Date(next_row.timestamp_completed * 1000);
                                         if ((next_day.getDate() == next_row_day.getDate())
                                             && (next_day.getMonth() == next_row_day.getMonth())

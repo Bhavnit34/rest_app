@@ -180,7 +180,7 @@ function putDaySummary(json, callback_data, callback) {
     // Find the userID, given the chat_id
     getUserID(json.callback_query.message.chat.id, function (user) {
         if (!user) {
-            logger.error("putSleepSummary() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
+            logger.error("putSleepSummary() : Unable to read User item.");
             return callback("error finding User for putSleepSummary");
         } else {
             userID = user;

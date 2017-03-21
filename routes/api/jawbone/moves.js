@@ -408,7 +408,7 @@ function getAwokenTime(userID, timestamp, callback) {
 // function to determine if the user has recently woken up and if so, ask about their sleep using Telegram
 function askAboutDay(move, userID, callback) {
     let date = move.date.toString();
-    let formattedDate = date.substr(0,4) + "/" + date.substr(4,2) + "/" + date.substr(6,2);
+    let formattedDate = date.substr(0,4) + "/" + date.substr(5,2) + "/" + date.substr(8,2);
 
     // first ensure the mood doesn't already exist
     checkMoodExists(userID, formattedDate, function(error, exists) {
@@ -465,7 +465,6 @@ function askAboutDay(move, userID, callback) {
                 let lastDate = new Date(awakeDate.getTime() + (3600000 * awake_hours));
 
                 logger.info ("The target Date is " + targetDate + ". The latest time to ask is at " + lastDate);
-                logger.info("Checking that " + now.toString() + " >= " + targetDate.toString() + " && " + now.toString() + " <= " + lastDate.getHours());
                 if ((now.getTime() >= targetDate.getTime()) && (now.getTime() <= lastDate.getTime())) {
                     // it is a suitable time to ask about the users day
                     // now we must check if they are not too busy, using recorded active time and steps
@@ -567,11 +566,11 @@ function telegramRequest(userID, callback) {
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"text\" : \"\uD83D\uDE01\", \"caller\": \"updateMoves\", \"mood\": 5, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"text\" : \"\uD83D\uDE0A\", \"caller\": \"updateMoves\", \"mood\": 4, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"text\" : \"\uD83D\uDE0C\", \"caller\": \"updateMoves\", \"mood\": 3, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"text\" : \"\uD83D\uDE14\", \"caller\": \"updateMoves\", \"mood\": 2, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"text\" : \"\uD83D\uDE2B\", \"caller\": \"updateMoves\", \"mood\": 1, \"date\": \"" + date + "\"}"}
+                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 5, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 4, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 3, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 2, \"date\": \"" + date + "\"}"},
+                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 1, \"date\": \"" + date + "\"}"}
                 ]
             ]}
         };

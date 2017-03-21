@@ -347,13 +347,13 @@ function askAboutSleep(sleep, userID, callback) {
     let ask = function() {
         logger.info("Checking if the user has recently awoken...");
         let activeTime = 0;
-        const awakeTime = new Date(sleep.details.awake_time * 1000);
-        const now = new Date();
-        const wokenHour = api.pad(awakeTime.getHours(), 2);
+        let awakeTime = new Date(sleep.details.awake_time * 1000);
+        let now = new Date();
+        let wokenHour = api.pad(awakeTime.getHours(), 2);
 
 
-        // check that the user woke up at most 2 hours ago
-        if (now.getTime() - awakeTime.getTime() <= 7200000) {
+        // check that the user woke up at most 3 hours ago
+        if (now.getTime() - awakeTime.getTime() <= 10800000) {
             // now check that the user has been recently active, to ensure they are actually awake
             // we will check their recent Moves info for active time
 
@@ -401,7 +401,7 @@ function askAboutSleep(sleep, userID, callback) {
                         }
                     }
 
-                    // now check active time; by this point the user woke up at most 2 hours ago
+                    // now check active time; by this point the user woke up at most 3 hours ago
                     if (activeTime >= 50) {
                         logger.info("User is currently active. Asking about their sleep...");
                         // the user is awake and active. Ask about their sleep
@@ -444,11 +444,11 @@ function telegramRequest(userID, callback) {
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"text\" : \"\uD83D\uDE01\", \"caller\": \"updateSleeps\", \"mood\": 5, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"text\" : \"\uD83D\uDE0A\", \"caller\": \"updateSleeps\", \"mood\": 4, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"text\" : \"\uD83D\uDE0C\", \"caller\": \"updateSleeps\", \"mood\": 3, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"text\" : \"\uD83D\uDE14\", \"caller\": \"updateSleeps\", \"mood\": 2, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"text\" : \"\uD83D\uDE2B\", \"caller\": \"updateSleeps\", \"mood\": 1, \"date\": \"" + date + "\"}"}
+                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 5}"},
+                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 4}"},
+                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 3}"},
+                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 2}"},
+                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 1}"}
                 ]
             ]}
         };

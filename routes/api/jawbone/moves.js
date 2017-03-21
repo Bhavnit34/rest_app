@@ -611,16 +611,23 @@ function telegramRequest(userID, callback) {
         const year = now.getFullYear();
         const date = year + "/" + month + "/" + day;
 
+        // encode emojis to UTF8 to allow them to be passed through JSON
+        let emojis = ["\uD83D\uDE01", "\uD83D\uDE0A", "\uD83D\uDE0C","\uD83D\uDE14","\uD83D\uDE2B"];
+        let encoded = [];
+        for (let i = 0; i < emojis.length; i++) {
+            encoded.push(unescape(encodeURIComponent(emojis[i])));
+        }
+
         const json = { "chat_id" : botDetails.chat_id,
             "text" : "How was your day today?",
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 5, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 4, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 3, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 2, \"date\": \"" + date + "\"}"},
-                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateMoves\", \"mood\": 1, \"date\": \"" + date + "\"}"}
+                    {"text" : emojis[0], "callback_data" : "{\"answer\": \"" + encoded[0] + "\", \"caller\": \"updateMoves\", \"mood\": 5}"},
+                    {"text" : emojis[1], "callback_data" : "{\"answer\": \"" + encoded[1] + "\", \"caller\": \"updateMoves\", \"mood\": 4}"},
+                    {"text" : emojis[2], "callback_data" : "{\"answer\": \"" + encoded[2] + "\", \"caller\": \"updateMoves\", \"mood\": 3}"},
+                    {"text" : emojis[3], "callback_data" : "{\"answer\": \"" + encoded[3] + "\", \"caller\": \"updateMoves\", \"mood\": 2}"},
+                    {"text" : emojis[4], "callback_data" : "{\"answer\": \"" + encoded[4] + "\", \"caller\": \"updateMoves\", \"mood\": 1}"}
                 ]
             ]}
         };

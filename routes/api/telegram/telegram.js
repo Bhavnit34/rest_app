@@ -155,7 +155,13 @@ function putSleepSummary(json, callback_data, callback) {
                         return callback("error updating mood for Sleep for putSleepSummary");
                     } else {
                         // now mark the message in the chat as answered, giving their answer
-                        editMessageAsAnswered(json, callback_data.text, function(error, msg) {
+                        let answer = null;
+                        // decode the emoji to display correctly on the msg
+                        if (callback_data.hasOwnProperty('answer')) {
+                            answer = decodeURIComponent(escape(callback_data.answer));
+                        }
+
+                        editMessageAsAnswered(json, answer, function(error, msg) {
                             if (error) {
                                 logger.error(msg);
                                 return callback(msg);

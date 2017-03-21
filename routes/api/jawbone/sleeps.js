@@ -502,16 +502,23 @@ function telegramRequest(userID, callback) {
         const year = now.getFullYear();
         const date = year + "/" + month + "/" + day;
 
+        // encode emojis to UTF8 to allow them to be passed through JSON
+        let emojis = ["\uD83D\uDE01", "\uD83D\uDE0A", "\uD83D\uDE0C","\uD83D\uDE14","\uD83D\uDE2B"];
+        let encoded = [];
+        for (let i = 0; i < emojis.length; i++) {
+            encoded.push(unescape(encodeURIComponent(emojis[i])));
+        }
+
         const json = { "chat_id" : botDetails.chat_id,
             "text" : "I've noticed you've started your day. How well did you sleep?",
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : "\uD83D\uDE01", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 5}"},
-                    {"text" : "\uD83D\uDE0A", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 4}"},
-                    {"text" : "\uD83D\uDE0C", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 3}"},
-                    {"text" : "\uD83D\uDE14", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 2}"},
-                    {"text" : "\uD83D\uDE2B", "callback_data" : "{\"caller\": \"updateSleeps\", \"mood\": 1}"}
+                    {"text" : emojis[0], "callback_data" : "{\"answer\": \"" + encoded[0] + "\", \"caller\": \"updateSleeps\", \"mood\": 5}"},
+                    {"text" : emojis[1], "callback_data" : "{\"answer\": \"" + encoded[1] + "\", \"caller\": \"updateSleeps\", \"mood\": 4}"},
+                    {"text" : emojis[2], "callback_data" : "{\"answer\": \"" + encoded[2] + "\", \"caller\": \"updateSleeps\", \"mood\": 3}"},
+                    {"text" : emojis[3], "callback_data" : "{\"answer\": \"" + encoded[3] + "\", \"caller\": \"updateSleeps\", \"mood\": 2}"},
+                    {"text" : emojis[4], "callback_data" : "{\"answer\": \"" + encoded[4] + "\", \"caller\": \"updateSleeps\", \"mood\": 1}"}
                 ]
             ]}
         };

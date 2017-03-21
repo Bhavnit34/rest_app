@@ -5,6 +5,7 @@ let https = require('https');
 let request = require('request');
 let loggerModule = require('../../logger');
 var api = require('../jawbone/api');
+let fs = require('fs');
 // AWS Dependencies
 let AWS = require('aws-sdk');
 AWS.config.update({
@@ -16,6 +17,9 @@ const logger = loggerModule.getLogger();
 const botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
 let msgID = 0;
 let IDs = {};
+
+// read in the stored json of handled IDs
+readIDsFromFile();
 
 router.post('/new-message', function(req,res_body) {
     let json = req.body;
@@ -54,7 +58,7 @@ router.post('/new-message', function(req,res_body) {
     };
 
 
-
+    // check if message requires a callback
     if (json.hasOwnProperty('callback_query')) {
         callbackID = json.callback_query.id;
         chat_id = json.callback_query.message.chat.id;
@@ -68,15 +72,29 @@ router.post('/new-message', function(req,res_body) {
         }
     }
 
-
+    // check if message was a standalone user message
     if (json.hasOwnProperty('message')) {
+        let msg = "";
         chat_id = json.message.chat.id;
+
+        // check if the message was a reply
+        if (json.message.hasOwnProperty('reply_to_message')) {
+            // ensure we haven't handled this
+            if (msgIDExists(chat_id, json.message.reply_to_message.message_id)) {
+                // avoid duplicate messages
+                msg = "You've already replied to that message";
+                logger.info("response to handled message detected");
+            }
+        }
         // handle message ID
         if (msgIDExists(chat_id, json.message.message_id)) {
             // avoid duplicate messages
             logger.info("duplicate response detected");
-            callbackMessage(chat_id, "I've already replied to that");
+            msg = "I've already replied to that";
+           
         }
+        callbackMessage(chat_id, msg);
+        return;
 
     }
 
@@ -210,13 +228,18 @@ function putDaySummary(json, callback_data, callback) {
                     return callback("error updating Sleep for putSleepSummary");
                 } else {
                     // now mark the message in the chat as answered, giving their answer
-                    editMessageAsAnswered(json, callback_data.text, function(error, msg) {
-                        if (error) {
-                            logger.error(msg);
-                            return callback(msg);
-                        }
-                        logger.info("The users mood has been added to their day!");
-                        return callback("Your mood for the day has been added");
+                    let answer = null;
+                    // decode the emoji to display correctly on the msg
+                    if (callback_data.hasOwnProperty('answer')) {
+                        answer = decodeURIComponent(escape(callback_data.answer));
+                    }
+                    editMessageAsAnswered(json, answer, function(error, msg) {
+                    if (error) {
+                        logger.error(msg);
+                        return callback(msg);
+                    }
+                    logger.info("The users mood has been added to their day!");
+                    return callback("Your mood for the day has been added");
                     });
                 }
             });
@@ -308,6 +331,44 @@ function editMessageAsAnswered(json_whole, answer, callback) {
     });
 }
 
+// function to read the handled messages from a local file
+function readIDsFromFile() {
+    fs.readFile('./IDs.json', 'utf8', function(err, data) {
+        if (err) {
+            logger.info("readIDsFromFile() : could not read JSON file. IDs is therefore currently empty");
+            return;
+        };
+        IDs = JSON.parse(data);
+    });
+}
+
+// function to store the IDs handled to
+function writeIDsToFile() {
+    logger.info(JSON.stringify(IDs));
+    fs.writeFileSync('./IDs.json', JSON.stringify(IDs));
+}
+
+
+// Handle cleanup
+process.stdin.resume();
+
+function exitHandler(options, err) {
+    if (options.cleanup) {
+        logger.info("Writing IDs to file before exiting...");
+        writeIDsToFile();
+    }
+    if (err) console.log(err.stack);
+    if (options.exit) process.exit();
+}
+
+// when app is about to close
+process.on('exit', exitHandler.bind(null,{cleanup:true}));
+
+// handles ctrl+c event
+process.on('SIGINT', exitHandler.bind(null, {exit:true}));
+
+//handles uncaught exceptions
+process.on('uncaughtException', exitHandler.bind(null, {exit:true}));
 
 
 module.exports = router;

@@ -355,13 +355,18 @@ function deleteOldData(table, date, user_id, updateCallback) {
 function checkMoodExists(userID, date, callback) {
     const params = {
         TableName : "DailyMood",
-        Key: {
-            "user_id" : userID,
-            "date" : date
+        KeyConditionExpression: "user_id = :user_id AND #date = :date",
+        ExpressionAttributeValues: {
+            ":user_id" : userID,
+            ":date" : date
         },
+        ExpressionAttributeNames: {
+            "#date" : "date"
+        },
+        Limit: 1
     };
 
-    docClient.get(params, function(err, data) {
+    docClient.query(params, function(err, data) {
         if (err) {
             logger.error("checkMoodExists() : Unable to read Move item. Error JSON:", JSON.stringify(err, null, 2));
             return callback(true, false); // error is true, exists is false
@@ -452,7 +457,7 @@ router.post('/askAboutDay', function(req,res_body){
             move = data.Items[0].info;
 
             let date = move.date.toString();
-            let formattedDate = date.substr(0, 4) + "/" + date.substr(5, 2) + "/" + date.substr(8, 2);
+            let formattedDate = date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2);
             // first ensure the mood doesn't already exist
             checkMoodExists(userID, formattedDate, function (error, exists) {
                 if (error) {

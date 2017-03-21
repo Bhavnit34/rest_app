@@ -208,7 +208,7 @@ function putDaySummary(json, callback_data, callback) {
             return callback("error finding User for putSleepSummary");
         } else {
             userID = user;
-            let dateString = date.getFullYear() + "/" + api.pad(date.getMonth(), 2).toString() + "/"
+            let dateString = date.getFullYear() + "/" + api.pad(date.getMonth()+1, 2).toString() + "/"
                 + api.pad(date.getDate(),2);
 
 

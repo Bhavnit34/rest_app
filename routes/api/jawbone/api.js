@@ -142,6 +142,64 @@ module.exports = {
                 }
             }
         });
+    },
+
+    // function to return the moves data for today
+    getRecentActiveTime: function(userID, callback) {
+        let msg = "";
+        let today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const query = "user_id = :user_id and timestamp_completed > :timestamp";
+        const attrValues = {
+            ":timestamp": parseInt(today.getTime().toString().substr(0, 10)),
+            ":user_id": userID
+
+        };
+        // Retrieve data from db
+        const params = {
+            TableName: "Moves",
+            KeyConditionExpression: query,
+            ExpressionAttributeValues: attrValues,
+            Limit: 1
+        };
+
+        // read the Moves table
+        docClient.query(params, function (err, data) {
+            if (err) {
+                msg = "getTodaysMoves() : Unable to read Moves item. Error JSON:" + JSON.stringify(err, null, 2);
+                logger.error(msg);
+                return callback(true, msg, null);
+            } else {
+                if (data.Count == 0) {
+                    msg = "getTodaysMoves() : No Moves info found for today";
+                    return callback(false, msg, null);
+                }
+                let now = new Date();
+                let date = data.Items[0].date;
+                let dateString = date.substr(0,4) + date.substr(5,2) + date.substr(8,2);
+                let move = data.Items[0].info;
+                let hour = pad(now.getHours().toString(), 2);
+                let hourly_total = dateString + hour;
+                let active_time = -1;
+                let steps = -1;
+
+                // check current hour, and this is too recent, then check hour before
+                for (let i = 0; i < 2; i++) {
+                    if (move.details.hourly_totals.hasOwnProperty(hourly_total)) {
+                        active_time = move.details.hourly_totals[hourly_total].active_time;
+                        steps = move.details.hourly_totals[hourly_total].steps;
+                        logger.info("found moves info as : active_time = " + active_time + ", steps = " + steps);
+                        break;
+                    } else {
+                        hour--;
+                        hour = api.pad(hour, 2).toString();
+                        hourly_total = dateString + hour;
+                    }
+                }
+
+                return callback(false, null, {"active_time" : active_time, "steps" :steps});
+            }
+        });
     }
 };
 

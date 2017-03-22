@@ -129,6 +129,7 @@ router.post('/new-message', function(req,res_body) {
 
 });
 
+// function to store the users response to their sleep
 function putSleepSummary(json, callback_data, callback) {
     let userID = "";
     let timestamp  = 0;
@@ -136,7 +137,7 @@ function putSleepSummary(json, callback_data, callback) {
     // Find the userID, given the chat_id
     getUserID(json.callback_query.message.chat.id, function (user) {
         if (!user) {
-            logger.error("putSleepSummary() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
+            logger.error("putSleepSummary() : Unable to read User item.");
             return callback("error finding User for putSleepSummary");
         } else {
             userID = user;
@@ -200,7 +201,7 @@ function putSleepSummary(json, callback_data, callback) {
     });
 }
 
-
+// function to store the users response to their day
 function putDaySummary(json, callback_data, callback) {
     let userID = "";
     let date  = new Date(json.callback_query.message.date * 1000);
@@ -253,8 +254,55 @@ function putDaySummary(json, callback_data, callback) {
     });
 }
 
+// function to store the users response to their workout
+function putWorkoutSummary(json, callback_data, callback) {
+    let userID = "";
+    let finished_timestamp = callback_data.timestamp;
+    let msg = "";
+    // Find the userID, given the chat_id
+    getUserID(json.callback_query.message.chat.id, function (user) {
+        if (!user) {
+            logger.error("putWorkoutSummary() : Unable to read User item.");
+            return callback("error finding User for putWorkoutSummary");
+        } else {
+            userID = user;
+            const params = {
+                TableName : "Workouts",
+                Key: {"user_id": userID, "timestamp_completed" : finished_timestamp},
+                UpdateExpression: "set mood = :mood",
+                ExpressionAttributeValues: {":mood" : callback_data.mood},
+                ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
+            };
+
+            // Update the Workout row to include the mood
+            docClient.update(params, function (err, data) {
+                if (err) {
+                    msg = "Error updating mood for Workouts table. Error JSON:" +  JSON.stringify(err, null, 2);
+                    logger.error(msg);
+                    return callback("Error updating mood in the table");
+                } else {
+                    // now mark the message in the chat as answered, giving their answer
+                    const answers = ["Falling asleep", "Somewhat tired", "Holding up OK", "Good", "Energised"];
+                    let answer = answers[callback_data.mood - 1]; // -1 as mood starts from 1
 
 
+                    editMessageAsAnswered(json, answer, function(error, msg) {
+                        if (error) {
+                            logger.error(msg);
+                            return callback(msg);
+                        }
+                        logger.info("The users mood has been added to their workout!");
+                        return callback("Your mood for the day has been added");
+                    });
+                }
+            });
+
+        }
+    });
+}
+
+
+// function to return the UserID, given the chatID
 function getUserID(chat_id, callback) {
     let userID = null;
     const params = {
@@ -279,9 +327,8 @@ function getUserID(chat_id, callback) {
 }
 
 
-
+// function to handle the msgID of each chat, to ensure we don't get duplicate responses
 function msgIDExists(chat_id, id) {
-    // handle message ID
     if (IDs.hasOwnProperty(chat_id)) {
         if (IDs[chat_id].indexOf(id) > -1) {
             return true;
@@ -296,6 +343,7 @@ function msgIDExists(chat_id, id) {
     }
 }
 
+// function to edit a sent msg to display their answer and restrict replying
 function editMessageAsAnswered(json_whole, answer, callback) {
     if (answer == null) {
         logger.info("editMessageAsAnswered() : Answer was undefined. Skipping editting msg");

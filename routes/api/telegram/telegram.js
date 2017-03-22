@@ -132,6 +132,7 @@ router.post('/new-message', function(req,res_body) {
 function putSleepSummary(json, callback_data, callback) {
     let userID = "";
     let timestamp  = 0;
+    let date  = new Date(json.callback_query.message.date * 1000);
     // Find the userID, given the chat_id
     getUserID(json.callback_query.message.chat.id, function (user) {
         if (!user) {
@@ -139,13 +140,15 @@ function putSleepSummary(json, callback_data, callback) {
             return callback("error finding User for putSleepSummary");
         } else {
             userID = user;
+            let dateString = date.getFullYear() + "/" + api.pad(date.getMonth()+1, 2).toString() + "/"
+                + api.pad(date.getDate(),2);
 
             const params = {
                 TableName : "Sleeps",
                 FilterExpression : "user_id = :user_id AND #date = :date",
                 ExpressionAttributeValues : {
                     ":user_id" : userID,
-                    ":date" : callback_data.date
+                    ":date" : dateString
                 },
                 ExpressionAttributeNames: { '#date' : 'date' }
             };
@@ -266,7 +269,6 @@ function getUserID(chat_id, callback) {
             logger.error("putSleepSummary() : Unable to read User item. Error JSON:", JSON.stringify(err, null, 2));
             return callback(userID);
         } else {
-            logger.info(JSON.stringify(user, null, 4));
             if (user.Count < 1) {
                 return callback(null);
             }

@@ -363,10 +363,12 @@ router.post('/askAboutSleep', function(req,res_body){
         docClient.query(params, function(err, data) {
             if (err) {
                 msg = ("askAboutSleep() : Error reading Sleeps table. Error JSON: " + JSON.stringify(err, null, 2));
+                logger.error(msg);
                 return callback(true, 500, "DynamoDB", msg);
             }
             if (data.Count == 0) {
                 msg = ("askAboutSleep() : Could not find a sleep for today.");
+                logger.info(msg);
                 return callback(false, 200, "DynamoDB", msg);
             }
 

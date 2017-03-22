@@ -98,7 +98,6 @@ router.post('/new-message', function(req,res_body) {
 
     }
 
-    logger.info("handling callbackID");
     // handle function for a message reply
     let callback_data = null;
     if (callbackID) {
@@ -107,7 +106,6 @@ router.post('/new-message', function(req,res_body) {
         switch (caller) {
             case "updateSleeps": {
                 putSleepSummary(json, callback_data, function(msg) {
-                    logger.info("replying from putSleepSummary");
                     callbackQuery(msg);
                 });
                 break;
@@ -115,7 +113,6 @@ router.post('/new-message', function(req,res_body) {
             case "updateMoves": {
                 logger.info("calling putDaySummary...");
                 putDaySummary(json, callback_data, function(msg) {
-                    logger.info("replying from putDaySummary");
                     callbackQuery(msg);
 
                 });
@@ -124,7 +121,6 @@ router.post('/new-message', function(req,res_body) {
             case "wo": {
                 logger.info("calling putWorkoutSummary...");
                 putWorkoutSummary(json, callback_data, function(msg) {
-                    logger.info("replying from putWorkoutSummary");
                     callbackQuery(msg);
 
                 });

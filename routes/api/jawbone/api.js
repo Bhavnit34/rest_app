@@ -178,7 +178,7 @@ module.exports = {
                 let date = data.Items[0].date;
                 let dateString = date.substr(0,4) + date.substr(5,2) + date.substr(8,2);
                 let move = data.Items[0].info;
-                let hour = pad(now.getHours().toString(), 2);
+                let hour = module.exports.pad(now.getHours().toString(), 2);
                 let hourly_total = dateString + hour;
                 let active_time = -1;
                 let steps = -1;
@@ -192,7 +192,7 @@ module.exports = {
                         break;
                     } else {
                         hour--;
-                        hour = api.pad(hour, 2).toString();
+                        hour = module.exports.pad(hour, 2).toString();
                         hourly_total = dateString + hour;
                     }
                 }

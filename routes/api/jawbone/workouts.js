@@ -376,10 +376,10 @@ router.post('/askAboutWorkout', function(req,res_body){
                         return callback(false, 200, "DynamoDB", msg);
                     }
 
-                    if (activity.active_time >= 50 && activity.active_time <= 300) {
+                    if (activity.active_time = 50 && activity.active_time <= 300) {
                         logger.info("User is currently active. Asking about their workout...");
                         // the user is awake and active. Ask about their sleep
-                        telegramRequest(userID, workout.title, function (error, msg) {
+                        telegramRequest(userID, workout.info.title, workout.timestamp_completed, function (error, msg) {
                             let code = error ? 500 : 200;
                             return callback(error, code, "Telegram", msg); // send the function result to the caller
                         });
@@ -411,13 +411,11 @@ function telegramRequest(userID, title, timestamp, callback) {
             "text" : "It looks like you recently did some excercise. ( " + title + " ). How tired do you feel now?",
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
-                [
-                    {"text" : "Energised", "callback_data" : "{\"caller\": \"wo\", \"mood\": 5, \"timestamp\": \"" + timestamp + "\"}"},
-                    {"text" : "Good", "callback_data" : "{\"caller\": \"wo\", \"mood\": 4, \"timestamp\": \"" + timestamp + "\"}"},
-                    {"text" : "Holding up OK", "callback_data" : "{\"caller\": \"wo\", \"mood\": 3}, \"timestamp\": \"" + timestamp + "\""},
-                    {"text" : "Somewhat tired", "callback_data" : "{\"caller\": \"wo\", \"mood\": 2}, \"timestamp\": \"" + timestamp + "\""},
-                    {"text" : "Falling asleep", "callback_data" : "{\"caller\": \"wo\", \"mood\": 1}, \"timestamp\": \"" + timestamp + "\""}
-                ]
+                [{"text" : "Energised", "callback_data" : "{\"caller\": \"wo\", \"mood\": 5, \"timestamp\": \"" + timestamp + "\"}"}],
+                    [{"text" : "Good", "callback_data" : "{\"caller\": \"wo\", \"mood\": 4, \"timestamp\": \"" + timestamp + "\"}"}],
+                    [{"text" : "Holding up OK", "callback_data" : "{\"caller\": \"wo\", \"mood\": 3, \"timestamp\": \"" + timestamp + "\"}"}],
+                    [{"text" : "Somewhat tired", "callback_data" : "{\"caller\": \"wo\", \"mood\": 2, \"timestamp\": \"" + timestamp + "\"}"}],
+                    [{"text" : "Falling asleep", "callback_data" : "{\"caller\": \"wo\", \"mood\": 1, \"timestamp\": \"" + timestamp + "\"}"}]
             ]}
         };
 

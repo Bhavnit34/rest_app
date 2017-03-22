@@ -98,7 +98,7 @@ router.post('/new-message', function(req,res_body) {
 
     }
 
-
+    logger.info("handling callbackID");
     // handle function for a message reply
     let callback_data = null;
     if (callbackID) {
@@ -266,7 +266,7 @@ function putDaySummary(json, callback_data, callback) {
 // function to store the users response to their workout
 function putWorkoutSummary(json, callback_data, callback) {
     let userID = "";
-    let finished_timestamp = callback_data.timestamp;
+    let finished_timestamp = parseInt(callback_data.timestamp);
     let msg = "";
     // Find the userID, given the chat_id
     getUserID(json.callback_query.message.chat.id, function (user) {
@@ -377,7 +377,7 @@ function editMessageAsAnswered(json_whole, answer, callback) {
         json: {
             "chat_id": chat_id,
             "message_id": msg_id,
-            "text": orig_text + " (You answered : " + answer + " )"
+            "text": orig_text + "\nYou answered : " + answer
         },
         headers: { "content-type" : "application/json"}
     }, function(err, res, body){

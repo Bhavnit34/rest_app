@@ -113,9 +113,18 @@ router.post('/new-message', function(req,res_body) {
                 break;
             }
             case "updateMoves": {
-                logger.info("calling putDaySummary...")
+                logger.info("calling putDaySummary...");
                 putDaySummary(json, callback_data, function(msg) {
                     logger.info("replying from putDaySummary");
+                    callbackQuery(msg);
+
+                });
+                break;
+            }
+            case "wo": {
+                logger.info("calling putWorkoutSummary...");
+                putWorkoutSummary(json, callback_data, function(msg) {
+                    logger.info("replying from putWorkoutSummary");
                     callbackQuery(msg);
 
                 });

@@ -53,6 +53,10 @@ module.exports = {
                 Telegram: {
                     message : "",
                     error : false
+                },
+                OpenWeather: {
+                    message : "",
+                    error : false
                 }
             };
         return json;
@@ -170,7 +174,7 @@ module.exports = {
                 logger.error(msg);
                 return callback(true, msg, null);
             } else {
-                if (data.Count == 0) {
+                if (data.Count === 0) {
                     msg = "getTodaysMoves() : No Moves info found for today";
                     return callback(false, msg, null);
                 }

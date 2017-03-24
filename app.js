@@ -57,6 +57,9 @@ app.use('/api/mood', require('./routes/api/jawbone/mood'));
 app.use('/api/sleeps', require('./routes/api/jawbone/sleeps'));
 app.use('/api/workouts', require('./routes/api/jawbone/workouts'));
 app.use('/api/telegram', require('./routes/api/telegram/telegram'));
+app.use('/api/telegram/sleeps', require('./routes/api/telegram/telegram_sleeps'));
+app.use('/api/telegram/moves', require('./routes/api/telegram/telegram_moves'));
+app.use('/api/telegram/workouts', require('./routes/api/telegram/telegram_workouts'));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

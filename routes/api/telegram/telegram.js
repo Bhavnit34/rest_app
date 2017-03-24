@@ -15,6 +15,7 @@ AWS.config.update({
 const docClient = new AWS.DynamoDB.DocumentClient();
 const logger = loggerModule.getLogger();
 const botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
+let emojis = ["\uD83D\uDE01", "\uD83D\uDE0A", "\uD83D\uDE0C","\uD83D\uDE14","\uD83D\uDE2B"];
 let msgID = 0;
 let IDs = {};
 
@@ -134,6 +135,26 @@ router.post('/new-message', function(req,res_body) {
 
 });
 
+// function to send a message to the user
+let sendTelegramMessage = function(userID, json, callback){
+        request({
+            url: 'https://api.telegram.org/bot' + botAPI + '/' + 'sendMessage',
+            method: "POST",
+            json: json,
+            headers: {"content-type": "application/json"}
+        }, function (err, res, body) {
+            let msg = "";
+            if (err) {
+                msg = 'telegramRequest() :  problem with request: ' + err.message;
+                logger.error(msg);
+                return callback(true, msg);
+            }
+            msg = "A telegram message has been sent to the user";
+            logger.info("telegramRequest() : " + msg);
+            return callback(false, msg);
+        });
+};
+
 // function to store the users response to their sleep
 function putSleepSummary(json, callback_data, callback) {
     let userID = "";
@@ -182,11 +203,10 @@ function putSleepSummary(json, callback_data, callback) {
                         return callback("error updating mood for Sleep for putSleepSummary");
                     } else {
                         // now mark the message in the chat as answered, giving their answer
-                        let answer = null;
-                        // decode the emoji to display correctly on the msg
-                        if (callback_data.hasOwnProperty('answer')) {
-                            answer = decodeURIComponent(escape(callback_data.answer));
-                        }
+                        const answers = ["Falling asleep " + emojis[4], "Somewhat tired " + emojis[3],
+                            "Holding up OK " + emojis[2], "Good " + emojis[1], "Energised " + emojis[0]];
+                        let answer = answers[callback_data.mood - 1]; // -1 as mood starts from 1
+
 
                         editMessageAsAnswered(json, answer, function(error, msg) {
                             if (error) {
@@ -287,7 +307,8 @@ function putWorkoutSummary(json, callback_data, callback) {
                     return callback("Error updating mood in the table");
                 } else {
                     // now mark the message in the chat as answered, giving their answer
-                    const answers = ["Falling asleep", "Somewhat tired", "Holding up OK", "Good", "Energised"];
+                    const answers = ["Falling asleep " + emojis[4], "Somewhat tired " + emojis[3],
+                        "Holding up OK " + emojis[2], "Good " + emojis[1], "Energised " + emojis[0]];
                     let answer = answers[callback_data.mood - 1]; // -1 as mood starts from 1
 
 
@@ -350,7 +371,7 @@ function msgIDExists(chat_id, id) {
 
 // function to edit a sent msg to display their answer and restrict replying
 function editMessageAsAnswered(json_whole, answer, callback) {
-    if (answer == null) {
+    if (answer === null) {
         logger.info("editMessageAsAnswered() : Answer was undefined. Skipping editting msg");
         return callback(false, null)
     }
@@ -392,8 +413,9 @@ function readIDsFromFile() {
         if (err) {
             logger.info("readIDsFromFile() : could not read JSON file. IDs is therefore currently empty");
             return;
-        };
+        }
         IDs = JSON.parse(data);
+        logger.info("IDs read as :" + JSON.stringify(IDs, null, 2));
     });
 }
 
@@ -425,5 +447,10 @@ process.on('SIGINT', exitHandler.bind(null, {exit:true}));
 //handles uncaught exceptions
 process.on('uncaughtException', exitHandler.bind(null, {exit:true}));
 
-
+/*
+router.use('/sleeps', require('./telegram_sleeps'));
+router.use('/moves', require('./telegram_moves'));
+router.use('/workouts', require('./telegram_workouts'));
+*/
 module.exports = router;
+module.exports.sendTelegramMessage = sendTelegramMessage;

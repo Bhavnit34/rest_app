@@ -4,6 +4,7 @@ var router = express.Router();
 var https = require('https');
 var api = require('./api');
 var loggerModule = require('../../logger');
+let telegram = require ('../telegram/telegram');
 let request = require('request');
 // AWS Dependencies
 var AWS = require("aws-sdk");
@@ -143,8 +144,8 @@ router.get('/:userId/', function(req,res){
 // function to gather the latest data from Jawbone and push to DynamoDB
 router.post('/updateMoves', function(req,res_body){
     // make a jawbone REST request for moves info
-    var path = '/nudge/api/v.1.1/users/@me/moves?';
-    var returnJson = api.newReturnJson();
+    let path = '/nudge/api/v.1.1/users/@me/moves?';
+    let returnJson = api.newReturnJson();
 
 
     // authenticate token
@@ -167,7 +168,7 @@ router.post('/updateMoves', function(req,res_body){
 
     // add limit to query if given
     if (req.body.limit) {
-        if(typeof req.body.limit == "number") {
+        if(typeof req.body.limit === "number") {
             path+= "&limit=" + parseInt(req.body.limit);
         } else {
             returnJson.Jawbone.message = "Limit must be an integer";
@@ -193,7 +194,7 @@ router.post('/updateMoves', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            if (res.statusCode != 200) {
+            if (res.statusCode !== 200) {
                 // REST response BAD, output error
                 returnJson.Jawbone.message = JSON.stringify(json_res, null, 2);
                 returnJson.Jawbone.error = true;
@@ -229,7 +230,7 @@ router.post('/updateMoves', function(req,res_body){
 
             // handle when all items have been completed, set appropriate return values
             if (i >= json_res.data.size) {
-                if (successCount == json_res.data.size) {
+                if (successCount === json_res.data.size) {
                     logger.info("All items added!");
                     returnJson.DynamoDB.message = "SUCCESS";
                     returnJson.DynamoDB.error = false;
@@ -240,8 +241,8 @@ router.post('/updateMoves', function(req,res_body){
                 }
 
                 let code = 200;
-                if (returnJson.DynamoDB.error == true || returnJson.Jawbone.error == true ||
-                    returnJson.Telegram.error == true) {
+                if (returnJson.DynamoDB.error === true || returnJson.Jawbone.error === true ||
+                    returnJson.Telegram.error === true) {
                     code = 500;
                 }
 
@@ -351,316 +352,6 @@ function deleteOldData(table, date, user_id, updateCallback) {
 
 }
 
-
-function checkMoodExists(userID, date, callback) {
-    const params = {
-        TableName : "DailyMood",
-        KeyConditionExpression: "user_id = :user_id AND #date = :date",
-        ExpressionAttributeValues: {
-            ":user_id" : userID,
-            ":date" : date
-        },
-        ExpressionAttributeNames: {
-            "#date" : "date"
-        },
-        Limit: 1
-    };
-
-    docClient.query(params, function(err, data) {
-        if (err) {
-            logger.error("checkMoodExists() : Unable to read Move item. Error JSON:", JSON.stringify(err, null, 2));
-            return callback(true, false); // error is true, exists is false
-        } else {
-            if (data.Count > 0) {
-                return callback(false, true);
-            } else {
-                return callback(false, false);
-            }
-        }
-    });
-}
-
-function getAwokenTime(userID, timestamp, callback) {
-    const params = {
-        TableName: "Sleeps",
-        KeyConditionExpression: "user_id = :user_id AND timestamp_completed > :timestamp",
-        ExpressionAttributeValues: {":user_id" : userID, ":timestamp" : parseInt(timestamp)},
-        Limit: 1
-    };
-
-    docClient.query(params, function(err, data) {
-        if (err) {
-            logger.error("getAwokenTime() : error reading Sleeps table. Error JSON: " + JSON.stringify(err, null, 2));
-            return callback(null);
-        }
-        if (data.Count < 1) {
-            return callback(null);
-        }
-        return callback(data.Items[0].info.details.awake_time);
-    })
-}
-
-// function to determine if the user has recently woken up and if so, ask about their sleep using Telegram
-router.post('/askAboutDay', function(req,res_body){
-    let returnJson = api.newReturnJson();
-    let userID = "";
-    let token = "";
-    let msg = "";
-
-    // This is where we respond to the request
-    let callback = function(error, code, type, msg) {
-        returnJson[type].error = error;
-        returnJson[type].message = msg;
-        return res_body.status(code).send(returnJson);
-    };
-
-    // check userId
-    if (!req.body.userId) {
-        msg = "Missing userId!";
-        return callback(true, 400, "Jawbone", msg);
-    } else {
-        userID = req.body.userId;
-    }
-
-    // authenticate token
-    if (!req.body.token) {
-        msg = "Token missing!";
-        return callback(true, 401, "Jawbone", msg);
-    } else {
-        token = req.body.token;
-    }
-
-    api.authenticateToken(token, userID, function() {
-        let move = {};
-        // retrieve the latest move
-        let today = new Date();
-        today.setHours(0,0,0,0);
-        let timestamp = parseInt(today.getTime().toString().substr(0,10));
-        const params = {
-            TableName : "Moves",
-            KeyConditionExpression: "user_id = :user_id AND timestamp_completed > :timestamp",
-            ExpressionAttributeValues: { ":user_id" : userID, ":timestamp" : timestamp }
-        };
-
-        // Query the Sleeps table for todays sleep
-        docClient.query(params, function(err, data) {
-            if (err) {
-                msg = ("askAboutSleep() : Error reading Moves table. Error JSON: " + JSON.stringify(err, null, 2));
-                return callback(true, 500, "DynamoDB", msg);
-            }
-            if (data.Count == 0) {
-                msg = ("askAboutSleep() : Could not find a sleep for today.");
-                return callback(false, 200, "DynamoDB", msg);
-            }
-
-            // the sleep we are looking at is set as the one that lasted the longest
-            move = data.Items[0].info;
-
-            let date = move.date.toString();
-            let formattedDate = date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2);
-            // first ensure the mood doesn't already exist
-            checkMoodExists(userID, formattedDate, function (error, exists) {
-                if (error) {
-                    msg = "askAboutSleep() : could not get mood information from the DailyMood table";
-                    logger.error(msg);
-                    return callback(true, 500, "DynamoDB", msg);
-                }
-                if (exists) {
-                    const msg = "The user has already given us their day summary";
-                    logger.info(msg);
-                    return callback(false, 200, "DynamoDB", msg);
-                } else {
-                    ask();
-                }
-            })
-        });
-
-        let ask = function() {
-            logger.info("Checking if the time is right to ask about the users day...");
-            const now = new Date();
-            let msg = "";
-
-            let midnight = new Date();
-            midnight.setHours(0,0,0,0);
-            let timestamp = midnight.getTime().toString().substr(0,10);
-
-            // firstly find how long they are awake for on average
-            const params = {
-                TableName: "Stats",
-                Key: {"user_id": userID},
-            };
-
-            // query Stats table for the users awake duration
-            docClient.get(params, function(err, data) {
-                if (err) {
-                    msg = "checkMoodExists() : Unable to read Stats item. Error JSON:" + JSON.stringify(err, null, 2);
-                    logger.error(msg);
-                    return callback(true, 500, "DynamoDB", msg);
-                }
-                let awake_duration = data.Item.info.Sleep.AwakeDuration.avg;
-
-                // now check that the time is about right to ask about their day
-                const awake_hours = Math.round(awake_duration / 3600); // convert seconds to hours
-                const target_hour = Math.round(awake_hours * 0.75); // set a target time of 3/4 into the day
-
-                logger.info("User is awake for " + awake_hours + " hours. The target hour is therefore " + target_hour + " hours past awake time");
-                getAwokenTime(userID, timestamp, function(awoken_time) {
-                    if (!awoken_time) {
-                        msg = "askAboutDay() : time awoken is currently not available";
-                        logger.info(msg);
-                        return callback(false, 200, "DynamoDB", msg);
-                    }
-
-                    let awakeDate = new Date(awoken_time * 1000);
-                    // add on 3/4 of a users day. This is our target start time to ask
-                    let targetDate = new Date(awakeDate.getTime() + (3600000 * target_hour));
-                    // get last hour to ask. This is when we guess the user will go to sleep, so don't ask after that.
-                    let lastDate = new Date(awakeDate.getTime() + (3600000 * awake_hours));
-
-                    logger.info ("The target Date is " + targetDate + ". The latest time to ask is at " + lastDate);
-                    if ((now.getTime() >= targetDate.getTime()) && (now.getTime() <= lastDate.getTime())) {
-                        // it is a suitable time to ask about the users day
-                        // now we must check if they are not too busy, using recorded active time and steps
-                        logger.info("We are in the right time slot");
-                        const params = {
-                            TableName : "Moves",
-                            KeyConditionExpression : "user_id = :user_id AND timestamp_completed > :timestamp",
-                            ExpressionAttributeValues : {":user_id" : userID, ":timestamp" : parseInt(timestamp)},
-                            Limit: 1
-                        };
-
-                        // read Moves table and find recent active time and steps
-                        docClient.query(params, function(err, data) {
-                            if (err) {
-                                msg = "askAboutDay() : error reading Moves table. Error JSON: " + JSON.stringify(err,null,2);
-                                logger.error(msg);
-                                return callback(true, 500, "DynamoDB", msg);
-                            }
-                            if (data.Count < 1) {
-                                msg = "askAboutDay() : There is no move data to query for today";
-                                logger.info(msg);
-                                return callback(false, 200, "DynamoDB", msg);
-                            }
-                            let date = data.Items[0].date;
-                            let dateString = date.substr(0,4) + date.substr(5,2) + date.substr(8,2);
-                            let move = data.Items[0].info;
-                            let hour = api.pad(now.getHours().toString(), 2);
-                            let hourly_total = dateString + hour;
-                            let active_time = -1;
-                            let steps = -1;
-
-                            // check current hour, and this is too recent, then check hour before
-                            for (let i = 0; i < 2; i++) {
-                                if (move.details.hourly_totals.hasOwnProperty(hourly_total)) {
-                                    active_time = move.details.hourly_totals[hourly_total].active_time;
-                                    steps = move.details.hourly_totals[hourly_total].steps;
-                                    logger.info("found moves info as : active_time = " + active_time + ", steps = " + steps);
-                                    break;
-                                } else {
-                                    hour--;
-                                    hour = api.pad(hour, 2).toString();
-                                    hourly_total = dateString + hour;
-                                }
-                            }
-
-
-                            if (active_time == -1 ) {
-                                // we didn't find a recent stat about the users activity
-                                msg = "Not enough information to make a decision about the users day";
-                                logger.info(msg);
-                                return callback(false, 200, "DynamoDB", msg);
-                            }
-
-                            // finally check that they are not too busy, and if so send a Telegram request
-                            if (active_time <= 200 || steps <= 150) {
-                                logger.info("User is not busy. Asking about their day...");
-                                // the user is active but not too busy
-                                telegramRequest(userID, function (error, msg) {
-                                    let code = error ? 500 : 200;
-                                    return callback(error, code, "Telegram", msg); // send the function result to the caller
-                                });
-                            } else {
-                                const msg = "The user seems to be busy. We won't ask about their day for now.";
-                                logger.info(msg);
-                                // We don't want to ask the user about their day at this point
-                                return callback(false, 200, "Telegram", msg);
-                            }
-
-
-
-                        });
-
-                    } else {
-                        msg = "It's not the right time to ask about their day";
-                        logger.info(msg);
-                        // We don't want to ask the user about their day at this point
-                        return callback(false, 200, "Telegram", msg);
-                    } // end check for current time within window
-
-                }); // end getAwokenTime() callback
-            }); // end query of Stats table
-        }; // end function ask()
-    });
-
-});
-
-// send a message to the users chat
-function telegramRequest(userID, callback) {
-    api.getbotDetails(userID, function(botDetails) {
-        if (botDetails == null) { return callback(false, "We don't have the users Telegram info. No message has been sent");}
-
-        const now = new Date();
-        const day = api.pad(now.getDate(),2).toString();
-        let month = now.getMonth() + 1;
-        month = api.pad(month, 2).toString();
-        const year = now.getFullYear();
-        const date = year + "/" + month + "/" + day;
-
-        // encode emojis to UTF8 to allow them to be passed through JSON
-        let emojis = ["\uD83D\uDE01", "\uD83D\uDE0A", "\uD83D\uDE0C","\uD83D\uDE14","\uD83D\uDE2B"];
-        let encoded = [];
-        for (let i = 0; i < emojis.length; i++) {
-            encoded.push(unescape(encodeURIComponent(emojis[i])));
-        }
-
-        const json = { "chat_id" : botDetails.chat_id,
-            "text" : "How was your day today?",
-            "force_reply" : "True",
-            "reply_markup": {"inline_keyboard": [
-                [
-                    {"text" : emojis[0], "callback_data" : "{\"answer\": \"" + encoded[0] + "\", \"caller\": \"updateMoves\", \"mood\": 5}"},
-                    {"text" : emojis[1], "callback_data" : "{\"answer\": \"" + encoded[1] + "\", \"caller\": \"updateMoves\", \"mood\": 4}"},
-                    {"text" : emojis[2], "callback_data" : "{\"answer\": \"" + encoded[2] + "\", \"caller\": \"updateMoves\", \"mood\": 3}"},
-                    {"text" : emojis[3], "callback_data" : "{\"answer\": \"" + encoded[3] + "\", \"caller\": \"updateMoves\", \"mood\": 2}"},
-                    {"text" : emojis[4], "callback_data" : "{\"answer\": \"" + encoded[4] + "\", \"caller\": \"updateMoves\", \"mood\": 1}"}
-                ]
-            ]}
-        };
-
-        request({
-            url: 'https://api.telegram.org/bot' + botDetails.botAPI + '/' + 'sendMessage',
-            method: "POST",
-            json: json,
-            headers: { "content-type" : "application/json"}
-        }, function(err, res, body){
-            let msg = "";
-            if(err) {
-                msg = 'telegramRequest :  problem with request: ' + err.message;
-                logger.error(msg);
-                return callback(true, msg);
-            }
-            msg = "A sleep request message has been sent to the user";
-            logger.info("telegramRequest : " + msg);
-            return callback(false, msg)
-        });
-    });
-
-}
-
-
-
-
-
 // function to calculate the stats from the whole table, if these values were lost
 function calculateInitialStats(userID, callback) {
     let Steps = {avg : 0, min : 0, max :0, total : 0, totalCount : 0, avgCount : 0};
@@ -695,7 +386,7 @@ function calculateInitialStats(userID, callback) {
 
                 // steps
                 let steps = data.Items[i].info.details.steps;
-                if (steps != null) {
+                if (steps !== null) {
                     Steps.totalCount++;
                     Steps.total += steps;
                     if (steps < Steps.min) {
@@ -707,7 +398,7 @@ function calculateInitialStats(userID, callback) {
 
                 // distance
                 let distance = data.Items[i].info.details.distance;
-                if (distance != null) {
+                if (distance !== null) {
                     Distance.totalCount++;
                     Distance.total += distance;
                     if (distance < Distance.min) {
@@ -719,7 +410,7 @@ function calculateInitialStats(userID, callback) {
 
                 // calories
                 let calories = data.Items[i].info.details.calories;
-                if (calories != null) {
+                if (calories !== null) {
                     Calories.totalCount++;
                     Calories.total += calories;
                     if (calories < Calories.min) {
@@ -731,7 +422,7 @@ function calculateInitialStats(userID, callback) {
 
                 // active time
                 let activeTime = data.Items[i].info.details.active_time;
-                if (activeTime != null) {
+                if (activeTime !== null) {
                     ActiveTime.totalCount++;
                     ActiveTime.total += activeTime;
                     if (activeTime < ActiveTime.min) {
@@ -863,7 +554,7 @@ router.post('/updateStats', function(req, res) {
                             if (err) {
                                 logger.error("Unable to read Moves item. Error JSON:", JSON.stringify(err, null, 2));
                             } else {
-                                if(data.Count == 0) {return callback(null);} // don't write any stats if there are no updates
+                                if(data.Count === 0) {return callback(null);} // don't write any stats if there are no updates
                                 // calculate new stats by taking into account the new values
                                 const row = data.Items;
                                 // use these so we don't include null moves in the averaging
@@ -884,7 +575,7 @@ router.post('/updateStats', function(req, res) {
                                 for (let i = 0; i < data.Items.length; i++) {
                                     // steps
                                     let steps = row[i].info.details.steps;
-                                    if (steps != null) {
+                                    if (steps !== null) {
                                         Steps.totalCount++;
                                         if (steps > newStats.Steps.max) {
                                             newStats.Steps.max = steps;
@@ -896,7 +587,7 @@ router.post('/updateStats', function(req, res) {
 
                                     // distance
                                     let distance = row[i].info.details.distance;
-                                    if (distance != null) {
+                                    if (distance !== null) {
                                         Distance.totalCount++;
                                         if (distance > newStats.Distance.max) {
                                             newStats.Distance.max = distance;
@@ -908,7 +599,7 @@ router.post('/updateStats', function(req, res) {
 
                                     // calories
                                     let calories = row[i].info.details.calories;
-                                    if (calories != null) {
+                                    if (calories !== null) {
                                         Calories.totalCount++;
                                         if (calories > newStats.Calories.max) {
                                             newStats.Calories.max = calories;
@@ -920,7 +611,7 @@ router.post('/updateStats', function(req, res) {
 
                                     // active time
                                     let activeTime = row[i].info.details.active_time;
-                                    if (activeTime != null) {
+                                    if (activeTime !== null) {
                                         ActiveTime.totalCount++;
                                         if (activeTime > newStats.ActiveTime.max) {
                                             newStats.ActiveTime.max = activeTime;

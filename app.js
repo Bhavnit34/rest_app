@@ -60,6 +60,7 @@ app.use('/api/telegram', require('./routes/api/telegram/telegram'));
 app.use('/api/telegram/sleeps', require('./routes/api/telegram/telegram_sleeps'));
 app.use('/api/telegram/moves', require('./routes/api/telegram/telegram_moves'));
 app.use('/api/telegram/workouts', require('./routes/api/telegram/telegram_workouts'));
+app.use('/api/weather', require('./routes/api/weather/weather'));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

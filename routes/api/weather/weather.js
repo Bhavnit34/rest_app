@@ -124,6 +124,11 @@ router.post('/updateWorkoutWeather', function(req,res_body){
 
                 });
 
+            } else {
+                msg = "It has been too long since the workout, which finished at " + finishTime.toLocaleString();
+                logger.info(msg);
+                // We don't want to ask the user about their workout at this point
+                return callback(false, 200, "Telegram", msg);
             }
 
 
@@ -135,8 +140,9 @@ router.post('/updateWorkoutWeather', function(req,res_body){
 
 function requestWeather(long, lat, callback) {
     let coords = "lat=" + lat + "&long=" + long;
+    logger.info("requesting weather...");
     request({
-        url: 'api.openweathermap.org/data/2.5/weather?' +  coords + "&APPID=" + app_id,
+        url: 'http://api.openweathermap.org/data/2.5/weather?' +  coords + "&APPID=" + app_id,
         method: "GET",
         headers: {"content-type" : "application/json"}
     }, function(err, res, body){

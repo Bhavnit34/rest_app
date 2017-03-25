@@ -201,7 +201,7 @@ router.post('/updateMoves', function(req,res_body){
                 return res_body.status(res.statusCode).send(returnJson);
             } else {
                 // REST response OK, proceed to DB update
-                json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
+                json_res = api.replaceEmptyStringWithNull(json_res);
                 returnJson.Jawbone.message = "SUCCESS";
                 returnJson.Jawbone.error = false;
                 putMoves();

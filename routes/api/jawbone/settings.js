@@ -112,10 +112,7 @@ router.post('/updateSettings', function(req,res_body){
                 returnJson.Jawbone.error = true;
                 return res_body.status(res.statusCode).send(returnJson);
             } else {
-                json_res.data.items = api.clearEmptyItemStrings(json_res.data.items, json_res.data.size);
-                for (var i = 0; i < json_res.data.size; i++) {
-                    api.clearEmptyDataStrings(json_res.data.items[i].details);
-                }
+                json_res = api.replaceEmptyStringWithNull(json_res);
                 returnJson.Jawbone.message = "SUCCESS";
                 returnJson.Jawbone.error = false;
                 putSettings();

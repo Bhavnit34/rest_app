@@ -10,32 +10,12 @@ AWS.config.update({
 var docClient = new AWS.DynamoDB.DocumentClient();
 var logger = loggerModule.getLogger();
 module.exports = {
-
-    // change empty strings within json data.items to null as db doesn't allow it
-    clearEmptyItemStrings: function(json, size) {
-        for (var i = 0; i < size; i++) {
-            for (var key in json[i]) {
-                var attrName = key.toString();
-                var value = json[i][attrName];
-                if (value == "") {
-                    json[i][attrName] = null
-                }
-            }
-        }
-        return json;
-    },
-
-    // clear any empty strings within json data to null as db doesn't allow it
-    clearEmptyDataStrings: function(json) {
-        for (var key in json) {
-            var attrName = key.toString();
-            var value = json[attrName];
-            if (value == "") {
-                json[attrName] = null
-            }
-        }
-
-        return json;
+    // function to replace all empty strings in a json with null
+    // as dynamoDB doesn't support empty strings in json
+    replaceEmptyStringWithNull: function(input) {
+        let temp = JSON.stringify(input);
+        let json = temp.replace(/\"\"/g, null);
+        return JSON.parse(json);
     },
 
     // used as a template for returning useful information to the caller

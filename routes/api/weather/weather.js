@@ -98,7 +98,7 @@ router.post('/updateWorkoutWeather', function(req,res_body){
 
 
             // check that the user worked out at most 3 hours ago
-            if (now.getTime() - finishTime.getTime() <= 10800000) {
+            if (now.getTime() - finishTime.getTime() >= 10800000) {
                 // grab the latest weather and assign it to the row
                 let lat = workout.info.place_lat;
                 let long = workout.info.place_lon;
@@ -139,6 +139,7 @@ router.post('/updateWorkoutWeather', function(req,res_body){
 });
 
 function requestWeather(long, lat, callback) {
+    let msg = "";
     let coords = "lat=" + lat + "&lon=" + long;
     let url = 'http://api.openweathermap.org/data/2.5/weather?' +  coords
     logger.info("requesting weather: " + url);
@@ -149,11 +150,21 @@ function requestWeather(long, lat, callback) {
         headers: {"content-type" : "application/json"}
     }, function(err, res, body){
         if(err) {
-            const msg = 'problem with request: ' + e.message;
+            msg = 'problem with request: ' + e.message;
             logger.error(msg);
             return callback(true, msg, null);
         }
-        return callback(false, null, body);
+        if(res.statusCode != 200) {
+            msg = "requestWeather() : OpenWeatherMaps returned a non 200 response code, " + JSON.stringify(weather, null, 2);
+            logger.error(msg);
+            return callback(true, msg, null);
+        }
+
+        // change empty strings to null, as DynamoDB doesn't allow empty strings
+        let weather = body.toString().replace(/\"\"/g, null);
+        json = JSON.parse(weather);
+        
+        return callback(false, null,json);
     });
 }
 

@@ -139,10 +139,12 @@ router.post('/updateWorkoutWeather', function(req,res_body){
 });
 
 function requestWeather(long, lat, callback) {
-    let coords = "lat=" + lat + "&long=" + long;
-    logger.info("requesting weather...");
+    let coords = "lat=" + lat + "&lon=" + long;
+    let url = 'http://api.openweathermap.org/data/2.5/weather?' +  coords
+    logger.info("requesting weather: " + url);
+    url +=  "&APPID=" + app_id;
     request({
-        url: 'http://api.openweathermap.org/data/2.5/weather?' +  coords + "&APPID=" + app_id,
+        url: url,
         method: "GET",
         headers: {"content-type" : "application/json"}
     }, function(err, res, body){

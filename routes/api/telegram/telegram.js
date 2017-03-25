@@ -203,8 +203,8 @@ function putSleepSummary(json, callback_data, callback) {
                         return callback("error updating mood for Sleep for putSleepSummary");
                     } else {
                         // now mark the message in the chat as answered, giving their answer
-                        const answers = ["Falling asleep " + emojis[4], "Somewhat tired " + emojis[3],
-                            "Holding up OK " + emojis[2], "Good " + emojis[1], "Energised " + emojis[0]];
+                        const answers = ["Very tired " + emojis[4], "Somewhat tired " + emojis[3],
+                            "OK " + emojis[2], "Good " + emojis[1], "Refreshed " + emojis[0]];
                         let answer = answers[callback_data.mood - 1]; // -1 as mood starts from 1
 
 
@@ -414,6 +414,7 @@ function readIDsFromFile() {
             logger.info("readIDsFromFile() : could not read JSON file. IDs is therefore currently empty");
             return;
         }
+        logger.info("ID DATA: " + data);
         IDs = JSON.parse(data);
         logger.info("IDs read as :" + JSON.stringify(IDs, null, 2));
     });
@@ -421,7 +422,7 @@ function readIDsFromFile() {
 
 // function to store the IDs handled to
 function writeIDsToFile() {
-    logger.info(JSON.stringify(IDs));
+    logger.info("IDs to write: " + JSON.stringify(IDs));
     fs.writeFileSync('./IDs.json', JSON.stringify(IDs));
 }
 
@@ -443,6 +444,8 @@ process.on('exit', exitHandler.bind(null,{cleanup:true}));
 
 // handles ctrl+c event
 process.on('SIGINT', exitHandler.bind(null, {exit:true}));
+
+process.on('SIGTERM', exitHandler.bind(null, {exit:true}));
 
 //handles uncaught exceptions
 process.on('uncaughtException', exitHandler.bind(null, {exit:true}));

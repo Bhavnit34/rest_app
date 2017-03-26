@@ -2,7 +2,7 @@
 var express = require('express');
 var router = express.Router();
 var https = require('https');
-var api = require('./api');
+var api = require('./../api');
 var loggerModule = require('../../logger');
 let telegram = require ('../telegram/telegram');
 let request = require('request');
@@ -50,7 +50,7 @@ router.get('/:userId/', function(req,res){
     // run this after authentication check below
     var proceed = function(authenticated) {
 
-        if (authenticated == false) {
+        if (authenticated === false) {
             returnJson.DynamoDB.message = "Authenication Failed";
             returnJson.DynamoDB.error = true;
             return res.status(401).send(returnJson);

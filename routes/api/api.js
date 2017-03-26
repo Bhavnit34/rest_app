@@ -1,6 +1,6 @@
 // Dependencies
 var sha1 = require("sha1");
-var loggerModule = require('../../logger');
+var loggerModule = require('../logger');
 // AWS dependencies
 var AWS = require("aws-sdk");
 AWS.config.update({
@@ -90,7 +90,7 @@ module.exports = {
             if (err) {
                 logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
-                if (data.Items[0].token_hash == hashedToken){
+                if (data.Items[0].token_hash === hashedToken){
                     return callback_proceed(true);
                 } else {
                     return callback_proceed(false);

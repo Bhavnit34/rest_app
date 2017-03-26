@@ -4,7 +4,7 @@ let router = express.Router();
 let https = require('https');
 let request = require('request');
 let loggerModule = require('../../logger');
-let api = require('../jawbone/api');
+let api = require('../api');
 let telegram = require('./telegram');
 // AWS Dependencies
 let AWS = require('aws-sdk');

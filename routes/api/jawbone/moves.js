@@ -738,19 +738,26 @@ router.post('/updateStats', function(req, res) {
             });
 
         });
-
         function updateWeeklyStats(callback) {
             logger.info("Calculating weeklyStats for Moves...");
             // firstly calculate the latest Sunday
             const table = "WeeklyStats";
             let sunday = new Date();
             sunday.setHours(0,0,0,0);
-            while (sunday.getDay() != 0) { // 0 = Sunday
-                sunday.setTime(sunday.getTime() - 86400000); // i.e. minus one day
+            while (sunday.getDay() !== 0) { // 0 = Sunday
+                sunday = new Date(sunday.getTime() - 86400000); // i.e. minus one day
+                if (sunday.getHours() === 23) {
+                    sunday = new Date(sunday.getTime() + 3600000); // add 1 hour if it goes into DST
+                }
             }
+            // the 10 digit timestamp of the sunday
             let date = parseInt(sunday.getTime().toString().substr(0,10));
-            let fullDate = new Date(date * 1000);
-            let dateString = fullDate.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+            // the date to be read in the logs
+            let dateString = sunday.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+
+            // e.g. 2017/01/01, the date to store in the table
+            let formattedDate = sunday.getFullYear() + "/" + api.pad(sunday.getMonth()+1, 2).toString() + "/"
+                + api.pad(sunday.getDate(),2);
 
             const params = {
                 TableName: table,
@@ -767,9 +774,7 @@ router.post('/updateStats', function(req, res) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
                     returnWeeksAverage(user_id, date, function (Averages) {
-                        if (Averages == null) {
-                            return callback(false, "error in getting average for week starting: " + dateString)
-                        }
+                        if(Averages === null){return callback(true, "updateWeeklyStats() : avg could not be calculated from " + dateString)}
                         // now store or update the calculated weekly average into the WeeklyStats table
                         let params = {};
 
@@ -783,14 +788,16 @@ router.post('/updateStats', function(req, res) {
                                     "timestamp_weekStart": date
                                 },
                                 UpdateExpression: "set info.Moves.Steps.#avg = :steps_avg," +
-                                "info.Moves.Distance.#avg = :distance_avg," +
-                                "info.Moves.Calories.#avg = :calories_avg," +
-                                "info.Moves.Active_time.#avg = :activeTime_avg",
+                                " info.Moves.Distance.#avg = :distance_avg," +
+                                " info.Moves.Calories.#avg = :calories_avg," +
+                                " info.Moves.Active_time.#avg = :activeTime_avg," +
+                                " date_weekStart = :date_weekStart",
                                 ExpressionAttributeValues: {
                                     ":steps_avg": Averages.steps,
                                     ":distance_avg": Averages.distance,
                                     ":calories_avg": Averages.calories,
-                                    ":activeTime_avg": Averages.activeTime
+                                    ":activeTime_avg": Averages.activeTime,
+                                    ":date_weekStart": formattedDate,
 
                                 },
                                 ExpressionAttributeNames: {
@@ -824,6 +831,7 @@ router.post('/updateStats', function(req, res) {
                                 Item: {
                                     "user_id": user_id,
                                     "timestamp_weekStart": date,
+                                    "date_weekStart": formattedDate,
                                     "info": json
                                 }
                             };
@@ -870,12 +878,12 @@ router.post('/updateStats', function(req, res) {
                     });
                     res.on('end', function () {
                         json_res = JSON.parse(body);
-                        if (res.statusCode != 200) {
+                        if (res.statusCode !== 200) {
                             // REST response BAD, output error
                             logger.error("Non 200 code for GET on Jawbone moves table. Error JSON:", JSON.stringify(json_res, null, 2));
                         } else {
                             if (json_res.data.size < 1) {
-                                return callback(null)
+                                return callback(null);
                             }
 
                             // use these so we don't include the null items in the averaging
@@ -887,27 +895,26 @@ router.post('/updateStats', function(req, res) {
                             for (let i = 0; i < 7; i++) {
                                 let move = json_res.data.items[i];
                                 if (move == null) { break ;} // end as there are less than 7 new days
-
                                 // steps
-                                if (move.details.steps != null) {
+                                if (move.details.steps !== null) {
                                     Steps.total += move.details.steps;
                                     Steps.totalCount++;
                                 }
 
                                 // distance
-                                if (move.details.distance != null) {
+                                if (move.details.distance !== null) {
                                     Distance.total += move.details.distance;
                                     Distance.totalCount++;
                                 }
 
                                 // calories
-                                if (move.details.calories != null) {
+                                if (move.details.calories !== null) {
                                     Calories.total += move.details.calories;
                                     Calories.totalCount++;
                                 }
 
                                 // active time
-                                if (move.details.active_time != null) {
+                                if (move.details.active_time !== null) {
                                     ActiveTime.total += move.details.active_time;
                                     ActiveTime.totalCount++;
                                 }

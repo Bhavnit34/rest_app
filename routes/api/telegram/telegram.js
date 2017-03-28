@@ -239,13 +239,13 @@ function putDaySummary(json, callback_data, callback) {
             userID = user;
             let dateString = date.getFullYear() + "/" + api.pad(date.getMonth()+1, 2).toString() + "/"
                 + api.pad(date.getDate(),2);
-
-
+            let timestamp = parseInt(date.getTime().toString().substr(0,10));
             const params = {
                 TableName : "DailyMood",
-                Key: {"user_id": userID, "date" : dateString},
-                UpdateExpression: "set mood = :mood",
-                ExpressionAttributeValues: {":mood" : callback_data.mood},
+                Key: {"user_id": userID, "timestamp_completed" : timestamp},
+                UpdateExpression: "set mood = :mood, #date = :date",
+                ExpressionAttributeValues: {":mood" : callback_data.mood, ":date": dateString},
+                ExpressionAttributeNames: {"#date" : "date"},
                 ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
             };
 
@@ -254,7 +254,7 @@ function putDaySummary(json, callback_data, callback) {
             docClient.update(params, function (err, data) {
                 if (err) {
                     logger.error("Error updating DailyMood table. Error JSON:", JSON.stringify(err, null, 2));
-                    return callback("error updating Sleep for putSleepSummary");
+                    return callback("error updating mood for putDaySummary");
                 } else {
                     // now mark the message in the chat as answered, giving their answer
                     let answer = null;

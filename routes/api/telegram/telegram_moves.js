@@ -15,16 +15,13 @@ AWS.config.update({
 const docClient = new AWS.DynamoDB.DocumentClient();
 const logger = loggerModule.getLogger();
 
-function checkMoodExists(userID, date, callback) {
+function checkMoodExists(userID, timestamp, callback) {
     const params = {
         TableName : "DailyMood",
-        KeyConditionExpression: "user_id = :user_id AND #date = :date",
+        KeyConditionExpression: "user_id = :user_id AND timestamp_completed = :timestamp",
         ExpressionAttributeValues: {
             ":user_id" : userID,
-            ":date" : date
-        },
-        ExpressionAttributeNames: {
-            "#date" : "date"
+            ":timestamp" : timestamp
         },
         Limit: 1
     };
@@ -119,9 +116,15 @@ router.post('/askAboutDay', function(req,res_body){
             move = data.Items[0].info;
 
             let date = move.date.toString();
+            // midnight of the day
+            let dateStart = new Date(move.timestamp_completed * 1000);
+            dateStart.setHours(0,0,0,0);
+            // 10 digit timestamp for query
+            let timestamp = parseInt(dateStart.getTime().toString().substr(0,10));
+
             let formattedDate = date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2);
             // first ensure the mood doesn't already exist
-            checkMoodExists(userID, formattedDate, function (error, exists) {
+            checkMoodExists(userID, timestamp, function (error, exists) {
                 if (error) {
                     msg = "askAboutDay() : could not get mood information from the DailyMood table";
                     logger.error(msg);
@@ -234,7 +237,7 @@ router.post('/askAboutDay', function(req,res_body){
                             }
 
                             // finally check that they are not too busy, and if so send a Telegram request
-                            if (active_time <= 300 && steps <= 200) {
+                            if (active_time <= 400 && steps <= 300) {
                                 logger.info("User is not busy. Asking about their day... active_time = " + active_time + ", steps = " + steps);
                                 // the user is active but not too busy
                                 telegramRequest(userID, function (error, msg) {

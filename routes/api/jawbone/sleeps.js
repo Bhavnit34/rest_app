@@ -1041,19 +1041,26 @@ router.post('/updateStats', function(req, res) {
             });
 
         });
-
         function updateWeeklyStats(callback) {
             logger.info("Calculating weeklyStats for Sleep...");
             // firstly calculate the latest Sunday
             const table = "WeeklyStats";
             let sunday = new Date();
             sunday.setHours(0, 0, 0, 0);
-            while (sunday.getDay() != 0) { // 0 = Sunday
-                sunday.setTime(sunday.getTime() - 86400000); // i.e. minus one day
+            while (sunday.getDay() !== 0) { // 0 = Sunday
+                sunday = new Date(sunday.getTime() - 86400000); // i.e. minus one day
+                if (sunday.getHours() === 23) {
+                    sunday = new Date(sunday.getTime() + 3600000); // add 1 hour if it goes into DST
+                }
             }
-            let date = parseInt(sunday.getTime().toString().substr(0, 10));
-            let fullDate = new Date(date * 1000);
-            let dateString = fullDate.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+            // the 10 digit timestamp of the sunday
+            let date = parseInt(sunday.getTime().toString().substr(0,10));
+            // the date to be read in the logs
+            let dateString = sunday.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+
+            // e.g. 2017/01/01, the date to store in the table
+            let formattedDate = sunday.getFullYear() + "/" + api.pad(sunday.getMonth()+1, 2).toString() + "/"
+                + api.pad(sunday.getDate(),2);
 
             const params = {
                 TableName: table,
@@ -1070,10 +1077,9 @@ router.post('/updateStats', function(req, res) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
                     returnWeeksAverage(user_id, date, function (Averages) {
+                        if(Averages == null){return callback(true, "updateWeeklyStats() : avg could not be calculated from " + dateString)}
 
-                        if (Averages == null) {
-                            return callback(false, "error in getting average for week starting: " + dateString);
-                        }
+
                         // now store or update the calculated weekly average into the WeeklyStats table
                         let params = {};
 
@@ -1092,7 +1098,8 @@ router.post('/updateStats', function(req, res) {
                                 " info.Sleep.Light.#avg = :Light_avg," +
                                 " info.Sleep.REM.#avg = :REM_avg," +
                                 " info.Sleep.Deep.#avg = :Deep_avg," +
-                                " info.Sleep.#Duration.#avg = :Duration_avg",
+                                " info.Sleep.#Duration.#avg = :Duration_avg," +
+                                " date_weekStart = :date_weekStart",
 
                                 ExpressionAttributeValues: {
                                     ":AwakeTime_avg": Averages.AwakeTime,
@@ -1101,7 +1108,8 @@ router.post('/updateStats', function(req, res) {
                                     ":Light_avg": Averages.Light,
                                     ":REM_avg": Averages.REM,
                                     ":Deep_avg": Averages.Deep,
-                                    ":Duration_avg": Averages.Duration
+                                    ":Duration_avg": Averages.Duration,
+                                    ":date_weekStart": formattedDate
 
                                 },
                                 ExpressionAttributeNames: {
@@ -1139,6 +1147,7 @@ router.post('/updateStats', function(req, res) {
                                 Item: {
                                     "user_id": user_id,
                                     "timestamp_weekStart": date,
+                                    "date_weekStart" : formattedDate,
                                     "info": json
                                 }
                             };
@@ -1182,7 +1191,7 @@ router.post('/updateStats', function(req, res) {
                         logger.error("Error reading Sleeps table. Error JSON:", JSON.stringify(err, null, 2));
                     } else {
                         if (data.Count < 1) {
-                            return callback(null)
+                            return callback(null);
                         } else {
                             // use these so we don't include the null items in the averaging
                             let AwakeDuration = {total: 0, totalCount : 0};
@@ -1224,11 +1233,11 @@ router.post('/updateStats', function(req, res) {
 
                                 // loop over the next days and store the local max duration of these days
                                 // once the next day is not the current one, continue
-                                while ((i+j) < data.Items.length && allSleepsForThisDayComplete == false) {
+                                while ((i+j) < data.Items.length && allSleepsForThisDayComplete === false) {
                                     let row = data.Items[i];
                                     let next_row = data.Items[i + j];
 
-                                    if (row.date == next_row.date) {
+                                    if (row.date === next_row.date) {
                                         // the next row has the same date as today
                                         if(next_row.info.details.duration > max_sleep) {
                                             // the next row (same day) has a longer sleep
@@ -1254,15 +1263,15 @@ router.post('/updateStats', function(req, res) {
                                 while ((index_max_sleep+j) < data.Items.length) {
                                     let this_row = data.Items[index_max_sleep];
                                     let next_row = data.Items[index_max_sleep + j];
-                                    if (this_row.date == next_row.date) {
+                                    if (this_row.date === next_row.date) {
                                         // skip this day, it's the same as today
                                         j++;
                                     } else {
                                         let next_day = new Date((this_row.timestamp_completed * 1000) + 86400000);
                                         let next_row_day = new Date(next_row.timestamp_completed * 1000);
-                                        if ((next_day.getDate() == next_row_day.getDate())
-                                            && (next_day.getMonth() == next_row_day.getMonth())
-                                            && (next_day.getFullYear() == next_row_day.getFullYear())) {
+                                        if ((next_day.getDate() === next_row_day.getDate())
+                                            && (next_day.getMonth() === next_row_day.getMonth())
+                                            && (next_day.getFullYear() === next_row_day.getFullYear())) {
                                             // the next row (thats not today) is at most 1 day later i.e. We can calculate the awake hours
                                             SleepDurationAvailable = true;
                                             break;
@@ -1289,7 +1298,7 @@ router.post('/updateStats', function(req, res) {
 
                                 // awake time
                                 let awake = data.Items[i].info.details.awake_time;
-                                if (awake != null) {
+                                if (awake !== null) {
                                     let awakeDate = new Date(awake * 1000);
                                     let awakeStart = new Date(awake * 1000);
                                     awakeStart.setHours(0,0,0,0);
@@ -1302,7 +1311,7 @@ router.post('/updateStats', function(req, res) {
 
                                 // asleep time
                                 let asleep = data.Items[i].info.details.asleep_time;
-                                if (asleep != null) {
+                                if (asleep !== null) {
                                     // calculate time in seconds, we don't want the whole timestamp
                                     let asleepDate = new Date(asleep * 1000);
                                     let asleepStart = new Date(asleep * 1000);
@@ -1319,7 +1328,7 @@ router.post('/updateStats', function(req, res) {
                                 if (SleepDurationAvailable && ((i) <  data.Items.length)) {
                                     let next_row = data.Items[index_next_day];
                                     let next_asleep = next_row.info.details.asleep_time;
-                                    if (next_asleep != null && awake != null) {
+                                    if (next_asleep !== null && awake !== null) {
                                         let awake_duration = next_asleep - awake;
                                         AwakeDuration.totalCount++;
                                         AwakeDuration.total += awake_duration;
@@ -1329,28 +1338,28 @@ router.post('/updateStats', function(req, res) {
 
                                 // light
                                 let light = data.Items[i].info.details.light;
-                                if (light != null) {
+                                if (light !== null) {
                                     Light.totalCount++;
                                     Light.total += light;
                                 }
 
                                 // rem
                                 let rem = data.Items[i].info.details.rem;
-                                if (rem != null) {
+                                if (rem !== null) {
                                     REM.totalCount++;
                                     REM.total += rem;
                                 }
 
                                 // deep
                                 let deep = data.Items[i].info.details.sound;
-                                if (deep != null) {
+                                if (deep !== null) {
                                     Deep.totalCount++;
                                     Deep.total += deep;
                                 }
 
                                 // duration
                                 let duration = data.Items[i].info.details.duration;
-                                if (duration != null) {
+                                if (duration !== null) {
                                     Duration.totalCount++;
                                     Duration.total += duration;
                                 }
@@ -1361,7 +1370,7 @@ router.post('/updateStats', function(req, res) {
                             // Calculate averages
                             let Averages = {AwakeDuration: 0, AwakeTime: 0, AsleepTime: 0, Light: 0, REM: 0, Deep: 0, Duration: 0};
                             Averages.AwakeDuration = Math.ceil(AwakeDuration.total / AwakeDuration.totalCount);
-                            if (AwakeDuration.totalCount == 0) { Averages.AwakeDuration = 0;}
+                            if (AwakeDuration.totalCount === 0) { Averages.AwakeDuration = 0;}
                             Averages.AwakeTime = Math.ceil(AwakeTime.total / AwakeTime.totalCount);
                             Averages.AsleepTime = Math.ceil(AsleepTime.total / AsleepTime.totalCount);
                             Averages.Light = Math.ceil(Light.total / Light.totalCount);

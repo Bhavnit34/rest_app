@@ -190,7 +190,7 @@ router.post('/askAboutSleep', function(req,res_body){
 
                         // now check active time; by this point the user woke up at most 3 hours ago
                         // we want to ensure they are active but not too busy
-                        if (activeTime >= 50 && activeTime <= 300) {
+                        if (activeTime >= 10 && activeTime <= 400) {
                             logger.info("User is currently active. Asking about their sleep...");
                             // the user is awake and active. Ask about their sleep
                             telegramRequest(userID, function (error, msg) {

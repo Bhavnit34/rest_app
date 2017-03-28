@@ -609,19 +609,26 @@ router.post('/updateStats', function(req, res) {
             });
 
         });
-
         function updateWeeklyStats(callback) {
             logger.info("Calculating weeklyStats for Workouts...");
             // firstly calculate the latest Sunday
             const table = "WeeklyStats";
             let sunday = new Date();
             sunday.setHours(0,0,0,0);
-            while (sunday.getDay() != 0) { // 0 = Sunday
-                sunday.setTime(sunday.getTime() - 86400000); // i.e. minus one day
+            while (sunday.getDay() !== 0) { // 0 = Sunday
+                sunday = new Date(sunday.getTime() - 86400000); // i.e. minus one day
+                if (sunday.getHours() === 23) {
+                    sunday = new Date(sunday.getTime() + 3600000); // add 1 hour if it goes into DST
+                }
             }
+            // the 10 digit timestamp of the sunday
             let date = parseInt(sunday.getTime().toString().substr(0,10));
-            let fullDate = new Date(date * 1000);
-            let dateString = fullDate.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+            // the date to be read in the logs
+            let dateString = sunday.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+
+            // e.g. 2017/01/01, the date to store in the table
+            let formattedDate = sunday.getFullYear() + "/" + api.pad(sunday.getMonth()+1, 2).toString() + "/"
+                + api.pad(sunday.getDate(),2);
 
             const params = {
                 TableName: table,
@@ -638,7 +645,7 @@ router.post('/updateStats', function(req, res) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
                     returnWeeksAverage(user_id, date, function(Averages) {
-                        if(Averages == null){return callback(true, "No workouts for week starting: " + dateString)}
+                        if(Averages === null){return callback(true, "updateWeeklyStats() : avg could not be calculated from " + dateString)}
                         // now store or update the calculated weekly average into the WeeklyStats table
                         let params = {};
 
@@ -654,12 +661,14 @@ router.post('/updateStats', function(req, res) {
                                 UpdateExpression: "set info.Workouts.#Count.#count = :Count_count," +
                                 " info.Workouts.Intensity.#avg = :Intensity_avg," +
                                 " info.Workouts.Calories.#avg = :Calories_avg," +
-                                " info.Workouts.#Time.#avg = :Time_avg",
+                                " info.Workouts.#Time.#avg = :Time_avg," +
+                                " date_weekStart = :date_weekStart",
                                 ExpressionAttributeValues:{
                                     ":Count_count": Averages.Count,
                                     ":Intensity_avg": Averages.Intensity,
                                     ":Calories_avg": Averages.Calories,
-                                    ":Time_avg": Averages.Time
+                                    ":Time_avg": Averages.Time,
+                                    ":date_weekStart": formattedDate
 
                                 },
                                 ExpressionAttributeNames: {
@@ -696,6 +705,7 @@ router.post('/updateStats', function(req, res) {
                                 Item: {
                                     "user_id": user_id,
                                     "timestamp_weekStart": date,
+                                    ":date_weekStart": formattedDate,
                                     "info": json
                                 }
                             };
@@ -737,7 +747,7 @@ router.post('/updateStats', function(req, res) {
                         logger.error("Error reading Workouts table. Error JSON:", JSON.stringify(err, null, 2));
                     } else {
                         if (data.Count < 1) {
-                            return callback(null)
+                            return callback(null);
                         } else {
                             // use these so we don't include the null items in the averaging
                             let count = data.Items.length;
@@ -747,23 +757,23 @@ router.post('/updateStats', function(req, res) {
 
                             for (let i = 0; i < data.Items.length; i++) {
                                 let workout = data.Items[i].info;
-                                if (workout == null) { continue ;}
+                                if (workout === null) { continue ;}
 
                                 // intensity
                                 let intensity = workout.details.intensity;
-                                if (intensity != null) {
+                                if (intensity !== null) {
                                     Intensity.total += intensity;
                                     Intensity.totalCount++;
                                 }
 
                                 // calories
-                                if (workout.details.calories != null) {
+                                if (workout.details.calories !== null) {
                                     Calories.total += workout.details.calories;
                                     Calories.totalCount++;
                                 }
 
                                 // time
-                                if (workout.details.time != null) {
+                                if (workout.details.time !== null) {
                                     Time.total += workout.details.time;
                                     Time.totalCount++;
                                 }

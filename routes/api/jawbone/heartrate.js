@@ -403,7 +403,7 @@ router.post('/updateStats', function(req, res) {
                             if (err) {
                                 logger.error("Unable to read HR item. Error JSON:", JSON.stringify(err, null, 2));
                             } else {
-                                if(data.AwakeTime == 0) {return callback(null);} // don't write any stats if there are no updates
+                                if(data.Count == 0) {return callback(null);} // don't write any stats if there are no updates
                                 // calculate new stats
                                 const row = data.Items;
                                 let total = 0;
@@ -490,12 +490,20 @@ router.post('/updateStats', function(req, res) {
             const table = "WeeklyStats";
             let sunday = new Date();
             sunday.setHours(0,0,0,0);
-            while (sunday.getDay() != 0) { // 0 = Sunday
-                sunday.setTime(sunday.getTime() - 86400000); // i.e. minus one day
+            while (sunday.getDay() !== 0) { // 0 = Sunday
+                sunday = new Date(sunday.getTime() - 86400000); // i.e. minus one day
+                if (sunday.getHours() === 23) {
+                    sunday = new Date(sunday.getTime() + 3600000); // add 1 hour if it goes into DST
+                }
             }
+            // the 10 digit timestamp of the sunday
             let date = parseInt(sunday.getTime().toString().substr(0,10));
-            let fullDate = new Date(date * 1000);
-            let dateString = fullDate.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+            // the date to be read in the logs
+            let dateString = sunday.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+
+            // e.g. 2017/01/01, the date to store in the table
+            let formattedDate = sunday.getFullYear() + "/" + api.pad(sunday.getMonth()+1, 2).toString() + "/"
+                + api.pad(sunday.getDate(),2);
 
             const params = {
                 TableName: table,
@@ -512,11 +520,11 @@ router.post('/updateStats', function(req, res) {
                     logger.error("Error reading " + table + " table. Error JSON:", JSON.stringify(err, null, 2));
                 } else {
                     returnWeeksAverage(user_id, date, function(avg) {
-                        if(avg == null){return callback(false, "error in getting average for week starting: " + dateString)}
+                        if(avg === null){return callback(true, "updateWeeklyStats() : avg could not be calculated from " + dateString)}
                         // now store or update the calculated weekly average into the WeeklyStats table
                         let params = {};
 
-                        if (data.AwakeTime > 0) { // update the row that exists
+                        if (data.Count > 0) { // update the row that exists
                             logger.info("Updating WeeklyStats row that already exists...");
 
                             const params = {
@@ -525,9 +533,10 @@ router.post('/updateStats', function(req, res) {
                                     "user_id": user_id,
                                     "timestamp_weekStart" : date
                                 },
-                                UpdateExpression: "set info.HeartRate.#avg = :avg",
+                                UpdateExpression: "set info.HeartRate.#avg = :avg, date_weekStart = :date_weekStart",
                                 ExpressionAttributeValues:{
                                     ":avg": avg,
+                                    ":date_weekStart": formattedDate
                                 },
                                 ExpressionAttributeNames: {
                                     "#avg": "avg"
@@ -557,6 +566,7 @@ router.post('/updateStats', function(req, res) {
                                 Item: {
                                     "user_id": user_id,
                                     "timestamp_weekStart": date,
+                                    "date_weekStart": formattedDate,
                                     "info": json
                                 }
                             };
@@ -579,7 +589,6 @@ router.post('/updateStats', function(req, res) {
 
                 }
             });
-
             // function to take a HR week block and return its average
             let returnWeeksAverage = function(user_id, date, callback) {
                 logger.info("Calculating average HR for week: " + date + "...");
@@ -598,14 +607,14 @@ router.post('/updateStats', function(req, res) {
                     if (err) {
                         logger.error("Error reading HeartRate table. Error JSON:", JSON.stringify(err, null, 2));
                     } else {
-                        if (data.AwakeTime < 1) {
-                            return callback(null)
+                        if (data.Count < 1) {
+                            return callback(null);
                         } else {
                             let total = 0;
                             let totalCount = 0; // use this so we don't include the null items in the averaging
                             for(let i = 0; i < data.Items.length; i++) {
                                 let hr = data.Items[i];
-                                if (hr.heartrate == null) {continue;} // skip days where HR wasn't recorded
+                                if (hr.heartrate === null) {continue;} // skip days where HR wasn't recorded
                                 total += hr.heartrate;
                                 totalCount++;
                             }

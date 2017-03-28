@@ -98,7 +98,7 @@ router.post('/updateWorkoutWeather', function(req,res_body){
 
 
             // check that the user worked out at most 3 hours ago
-            if (now.getTime() - finishTime.getTime() >= 10800000) {
+            if (now.getTime() - finishTime.getTime() <= 10800000) {
                 // grab the latest weather and assign it to the row
                 let lat = workout.info.place_lat;
                 let long = workout.info.place_lon;

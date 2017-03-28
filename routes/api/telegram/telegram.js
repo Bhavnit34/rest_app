@@ -214,7 +214,7 @@ function putSleepSummary(json, callback_data, callback) {
                                 return callback(msg);
                             }
                             logger.info("The users mood has been added to their day!");
-                            return callback("Your mood for the day has been added");
+                            return callback("Your sleep feedback has been logged");
                         });
                     }
                 });
@@ -268,7 +268,7 @@ function putDaySummary(json, callback_data, callback) {
                         return callback(msg);
                     }
                     logger.info("The users mood has been added to their day!");
-                    return callback("Your mood for the day has been added");
+                    return callback("Your mood for the day has been logged");
                     });
                 }
             });
@@ -318,7 +318,7 @@ function putWorkoutSummary(json, callback_data, callback) {
                             return callback(msg);
                         }
                         logger.info("The users mood has been added to their workout!");
-                        return callback("Your mood for the day has been added");
+                        return callback("Your workout feedback has been logged");
                     });
                 }
             });
@@ -450,10 +450,5 @@ process.on('SIGTERM', exitHandler.bind(null, {exit:true}));
 //handles uncaught exceptions
 process.on('uncaughtException', exitHandler.bind(null, {exit:true}));
 
-/*
-router.use('/sleeps', require('./telegram_sleeps'));
-router.use('/moves', require('./telegram_moves'));
-router.use('/workouts', require('./telegram_workouts'));
-*/
 module.exports = router;
 module.exports.sendTelegramMessage = sendTelegramMessage;

@@ -114,14 +114,12 @@ router.post('/askAboutDay', function(req,res_body){
             }
 
             move = data.Items[0].info;
-
             let date = move.date.toString();
             // midnight of the day
-            let dateStart = new Date(move.timestamp_completed * 1000);
+            let dateStart = new Date(move.time_completed * 1000);
             dateStart.setHours(0,0,0,0);
             // 10 digit timestamp for query
             let timestamp = parseInt(dateStart.getTime().toString().substr(0,10));
-
             let formattedDate = date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2);
             // first ensure the mood doesn't already exist
             checkMoodExists(userID, timestamp, function (error, exists) {

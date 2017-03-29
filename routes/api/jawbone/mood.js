@@ -1,17 +1,17 @@
 // Dependencies
-var express = require('express');
-var router = express.Router();
-var https = require('https');
-var api = require('./../api');
-var loggerModule = require('../../logger');
+let express = require('express');
+let router = express.Router();
+let https = require('https');
+let api = require('./../api');
+let loggerModule = require('../../logger');
 // AWS Dependencies
-var AWS = require("aws-sdk");
+let AWS = require("aws-sdk");
 AWS.config.update({
     region: "eu-west-1",
     endpoint: "https://dynamodb.eu-west-1.amazonaws.com"
 });
-var docClient = new AWS.DynamoDB.DocumentClient();
-var logger = loggerModule.getLogger();
+let docClient = new AWS.DynamoDB.DocumentClient();
+let logger = loggerModule.getLogger();
 
 router.get('/test', function(req,res){
     res.send('mood working');
@@ -19,35 +19,36 @@ router.get('/test', function(req,res){
 });
 
 // function to return stored mood data
-router.get('/:userId/', function(req, res) {
-    var table = "Mood";
-    var user_id = "";
-    var returnJson = api.newReturnJson();
-    var limit = 10;
-    var attrValues = {};
+router.get('/:userId/', function(req_body, res) {
+    let table = "DailyMood";
+    let user_id = "";
+    let returnJson = api.newReturnJson();
+    let limit = 10;
+    let attrValues = {};
+    let token = "";
 
     // check for passed userID
-    if (!req.params.userId){
+    if (!req_body.params.userId){
         returnJson.DynamoDB.message = "User ID missing!";
         returnJson.DynamoDB.error = true;
         return res.status(400).send(returnJson);
     } else {
-        user_id = req.params.userId;
+        user_id = req_body.params.userId;
     }
 
     // authenticate token
-    if (!req.query.token){
+    if (!req_body.query.token){
         returnJson.DynamoDB.message = "Token missing!";
         returnJson.DynamoDB.error = true;
         return res.status(401).send(returnJson);
     } else {
-        var token = req.query.token;
+        token = req_body.query.token;
     }
 
     // run this after authentication check below
-    var proceed = function(authenticated) {
+    let proceed = function(authenticated) {
 
-        if (authenticated == false) {
+        if (authenticated === false) {
             returnJson.DynamoDB.message = "Authenication Failed";
             returnJson.DynamoDB.error = true;
             return res.status(401).send(returnJson);
@@ -55,9 +56,9 @@ router.get('/:userId/', function(req, res) {
 
 
         // add limit to query if given
-        if (req.query.limit) {
-            if (!isNaN(req.query.limit)) {
-                limit = parseInt(req.query.limit);
+        if (req_body.query.limit) {
+            if (!isNaN(req_body.query.limit)) {
+                limit = parseInt(req_body.query.limit);
             } else {
                 returnJson.DynamoDB.message = "Limit must be an integer";
                 returnJson.DynamoDB.error = true;
@@ -67,11 +68,11 @@ router.get('/:userId/', function(req, res) {
 
 
         // add startDate to query if given
-        var startDate = null;
-        if (req.query.startDate) {
-            if (!isNaN(Date.parse(req.query.startDate))) {
-                startDate = req.query.startDate;
-                var startStamp = new Date(startDate).getTime().toString().substr(0,10);
+        let startDate = null;
+        if (req_body.query.startDate) {
+            if (!isNaN(Date.parse(req_body.query.startDate))) {
+                startDate = req_body.query.startDate;
+                let startStamp = new Date(startDate).getTime().toString().substr(0,10);
                 attrValues[':startStamp'] = parseInt(startStamp);
             } else {
                 returnJson.DynamoDB.message = "Invalid startDate";
@@ -81,14 +82,14 @@ router.get('/:userId/', function(req, res) {
         }
 
         // add endDate to query if given
-        var endDate = null;
-        if (req.query.endDate) {
-            if (!isNaN(Date.parse(req.query.endDate))) {
+        let endDate = null;
+        if (req_body.query.endDate) {
+            if (!isNaN(Date.parse(req_body.query.endDate))) {
                 // get the end of this day by getting the next day and minusing 1 off the UNIX timestamp
-                endDate = req.query.endDate;
-                var nextDate =  new Date(endDate);
+                endDate = req_body.query.endDate;
+                let nextDate =  new Date(endDate);
                 nextDate.setDate(nextDate.getDate() + 1);
-                var endStamp = new Date(nextDate).getTime().toString().substr(0, 10);
+                let endStamp = new Date(nextDate).getTime().toString().substr(0, 10);
                 attrValues[':endStamp'] = parseInt(endStamp) - 1;
             } else {
                 returnJson.DynamoDB.message = "Invalid endDate";
@@ -99,7 +100,7 @@ router.get('/:userId/', function(req, res) {
 
 
         // create query and append attributes if requested
-        var query = "user_id = :user_id";
+        let query = "user_id = :user_id";
         attrValues[':user_id'] = user_id;
         if (startDate && endDate) {
             if(attrValues[':startStamp'] > attrValues[':endStamp']) {
@@ -107,28 +108,25 @@ router.get('/:userId/', function(req, res) {
                 returnJson.DynamoDB.error = true;
                 return res.status(400).send(returnJson);
             }
-            query += " AND #timestamp BETWEEN :startStamp AND :endStamp"; //results between dates
+            query += " AND timestamp_completed BETWEEN :startStamp AND :endStamp"; //results between dates
         } else if (startDate) {
-            query += " AND #timestamp >= :startStamp"; // show dates going forwards from startDate
+            query += " AND timestamp_completed >= :startStamp"; // show dates going forwards from startDate
         } else if (endDate) {
-            query += " AND #timestamp <= :endStamp"; // show dates going backwards from endDate
+            query += " AND timestamp_completed <= :endStamp"; // show dates going backwards from endDate
         }
 
         // Retrieve data from db
-        var params = {
+        let params = {
             TableName: table,
             KeyConditionExpression: query,
             ExpressionAttributeValues: attrValues,
-            Limit: limit,
-            ExpressionAttributeNames: {
-                "#timestamp": "timestamp"
-            }
+            Limit: limit
         };
 
 
         docClient.query(params, function (err, data) {
             if (err) {
-                console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+                logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
                 //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
                 res.send(JSON.stringify(data, null, 2));
@@ -142,21 +140,21 @@ router.get('/:userId/', function(req, res) {
 });
 
 // function to gather the latest data from Jawbone and push to DynamoDB
-router.post('/updateMood', function(req,res_body){
-    var path = '/nudge/api/v.1.1/users/@me/mood?';
-    var returnJson = api.newReturnJson();
+router.post('/updateMood', function(req_body,res_body){
+    let path = '/nudge/api/v.1.1/users/@me/mood?';
+    let returnJson = api.newReturnJson();
 
 
     // authenticate token
-    if (!req.body.token){
+    if (!req_body.body.token){
         returnJson.Jawbone.message = "Token missing!";
         returnJson.Jawbone.error = true;
         return res_body.status(401).send(returnJson);
     }
 
     // add date to query if given
-    if (req.body.date){
-        if (req.body.date.toString().match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) { //match YYYYMMDD
+    if (req_body.body.date){
+        if (req_body.body.date.toString().match(/^(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/)) { //match YYYYMMDD
             path += "&date=" + req.body.date;
         } else {
             returnJson.Jawbone.message = "Please use date format YYYYMMDD";
@@ -166,15 +164,15 @@ router.post('/updateMood', function(req,res_body){
     }
 
 
-    var options = {
+    let options = {
         host: 'jawbone.com',
         path: path,
         headers: {'Authorization': 'Bearer ' + req.body.token},
         method: 'GET'
     };
-    var body = "";
-    var json_res = {};
-    var req = https.request(options, function(res) {
+    let body = "";
+    let json_res = {};
+    let req = https.request(options, function(res) {
         logger.debug('JAWBONE HTTP GET RESPONSE: ' + res.statusCode);
 
         res.on('data', function(d) {
@@ -182,7 +180,7 @@ router.post('/updateMood', function(req,res_body){
         });
         res.on('end', function() {
             json_res = JSON.parse(body);
-            if (res.statusCode != 200) {
+            if (res.statusCode !== 200) {
                 // REST response BAD, output error
                 returnJson.Jawbone.message = JSON.stringify(json_res, null, 2);
                 returnJson.Jawbone.error = true;
@@ -212,12 +210,12 @@ router.post('/updateMood', function(req,res_body){
 
 
     // Load user info into db
-    var putMoodEvents = function () {
-        var table = "Mood";
-        var user_id = json_res.meta.user_xid;
-        var date = json_res.data.date.toString();
+    let putMoodEvents = function () {
+        let table = "Mood";
+        let user_id = json_res.meta.user_xid;
+        let date = json_res.data.date.toString();
 
-        var params = {
+        let params = {
             TableName: table,
             Item: {
                 "user_id": user_id,

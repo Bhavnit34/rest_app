@@ -198,7 +198,7 @@ router.post('/askAboutSleep', function(req,res_body){
                                 return callback(error, code, "Telegram", msg); // send the function result to the caller
                             });
                         } else {
-                            const msg = "The user may not be awake. We won't ask them about their sleep. (active time = " + activeTime + ")";
+                            const msg = "The user does not seem available. We won't ask them about their sleep. (active time = " + activeTime + ")";
                             logger.info(msg);
                             // We don't want to ask the user about their sleep at this point
                             return callback(false, 200, "Telegram", msg);

@@ -18,7 +18,7 @@ const logger = loggerModule.getLogger();
 function checkMoodExists(userID, timestamp, callback) {
     const params = {
         TableName : "DailyMood",
-        KeyConditionExpression: "user_id = :user_id AND timestamp_completed = :timestamp",
+        KeyConditionExpression: "user_id = :user_id AND timestamp_completed > :timestamp",
         ExpressionAttributeValues: {
             ":user_id" : userID,
             ":timestamp" : timestamp
@@ -111,36 +111,15 @@ router.post('/askAboutDay', function(req,res_body){
             if (data.Count === 0) {
                 msg = ("askAboutDay() : Could not find a move for today.");
                 return callback(false, 200, "DynamoDB", msg);
+            } else {
+                move = data.Items[0].info;
+                checkLatestMood();
             }
-
-            move = data.Items[0].info;
-            let date = move.date.toString();
-            // midnight of the day
-            let dateStart = new Date(move.time_completed * 1000);
-            dateStart.setHours(0,0,0,0);
-            // 10 digit timestamp for query
-            let timestamp = parseInt(dateStart.getTime().toString().substr(0,10));
-            let formattedDate = date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2);
-            // first ensure the mood doesn't already exist
-            checkMoodExists(userID, timestamp, function (error, exists) {
-                if (error) {
-                    msg = "askAboutDay() : could not get mood information from the DailyMood table";
-                    logger.error(msg);
-                    return callback(true, 500, "DynamoDB", msg);
-                }
-                if (exists) {
-                    const msg = "The user has already given us their day summary";
-                    logger.info(msg);
-                    return callback(false, 200, "DynamoDB", msg);
-                } else {
-                    ask();
-                }
-            })
         });
 
-        let ask = function() {
+        let checkLatestMood = function() {
             logger.info("Checking if the time is right to ask about the users day...");
-            const now = new Date();
+     
             let msg = "";
 
             // firstly find how long they are awake for on average
@@ -152,117 +131,144 @@ router.post('/askAboutDay', function(req,res_body){
             // query Stats table for the users awake duration
             docClient.get(params, function(err, data) {
                 if (err) {
-                    msg = "checkMoodExists() : Unable to read Stats item. Error JSON:" + JSON.stringify(err, null, 2);
+                    msg = "askAboutDay() : Unable to read Stats item. Error JSON:" + JSON.stringify(err, null, 2);
                     logger.error(msg);
                     return callback(true, 500, "DynamoDB", msg);
                 }
                 let awake_duration = data.Item.info.Sleep.AwakeDuration.avg;
 
                 // now check that the time is about right to ask about their day
-                const awake_hours = Math.round(awake_duration / 3600); // convert seconds to hours
-                const target_hour = Math.round(awake_hours * 0.75); // set a target time of 3/4 into the day
+                let awake_hours = Math.round(awake_duration / 3600); // convert seconds to hours
+                let target_hour = Math.round(awake_hours * 0.75); // set a target time of 3/4 into the day
 
                 // calculate the latest awake time as the nearest one to (now - awake_hours)
                 // this is so we can query the awake time of the previous day if we are checking after midnight
                 let midnight = new Date(new Date().getTime() - (awake_duration * 1000));
                 midnight.setHours(0,0,0,0);
-                let timestamp = midnight.getTime().toString().substr(0,10);
+                let timestamp_midnight = parseInt(midnight.getTime().toString().substr(0,10));
 
-                logger.info("User is awake for " + awake_hours + " hours. The target hour is therefore " + target_hour + " hours past awake time");
-                getAwokenTime(userID, timestamp, function(awoken_time) {
-                    if (!awoken_time) {
-                        msg = "askAboutDay() : time awoken is currently not available";
+
+                // now check that the mood hasn't been filled in for the day of the awake_time
+                let date = move.date.toString();
+                // midnight of the day
+                let dateStart = new Date(move.time_completed * 1000);
+                dateStart.setHours(0,0,0,0);
+                let formattedDate = date.substr(0, 4) + "/" + date.substr(4, 2) + "/" + date.substr(6, 2);
+                // first ensure the mood doesn't already exist
+                checkMoodExists(userID, timestamp_midnight, function (error, exists) {
+                    if (error) {
+                        msg = "askAboutDay() : could not get mood information from the DailyMood table";
+                        logger.error(msg);
+                        return callback(true, 500, "DynamoDB", msg);
+                    }
+                    if (exists) {
+                        const msg = "The user has already given us their day summary";
                         logger.info(msg);
                         return callback(false, 200, "DynamoDB", msg);
-                    }
-
-                    let awakeDate = new Date(awoken_time * 1000);
-                    // add on 3/4 of a users day. This is our target start time to ask
-                    let targetDate = new Date(awakeDate.getTime() + (3600000 * target_hour));
-                    // get last hour to ask. This is when we guess the user will go to sleep, so don't ask after that.
-                    let lastDate = new Date(awakeDate.getTime() + (3600000 * awake_hours));
-
-                    logger.info ("The target Date is " + targetDate + ". The latest time to ask is at " + lastDate);
-                    if ((now.getTime() >= targetDate.getTime()) && (now.getTime() <= lastDate.getTime())) {
-                        // it is a suitable time to ask about the users day
-                        // now we must check if they are not too busy, using recorded active time and steps
-                        const params = {
-                            TableName : "Moves",
-                            KeyConditionExpression : "user_id = :user_id AND timestamp_completed > :timestamp",
-                            ExpressionAttributeValues : {":user_id" : userID, ":timestamp" : parseInt(timestamp)},
-                            Limit: 1
-                        };
-
-                        // read Moves table and find recent active time and steps
-                        docClient.query(params, function(err, data) {
-                            if (err) {
-                                msg = "askAboutDay() : error reading Moves table. Error JSON: " + JSON.stringify(err,null,2);
-                                logger.error(msg);
-                                return callback(true, 500, "DynamoDB", msg);
-                            }
-                            if (data.Count < 1) {
-                                msg = "askAboutDay() : There is no move data to query for today";
-                                logger.info(msg);
-                                return callback(false, 200, "DynamoDB", msg);
-                            }
-                            let date = data.Items[0].date;
-                            let dateString = date.substr(0,4) + date.substr(5,2) + date.substr(8,2);
-                            let move = data.Items[0].info;
-                            let hour = api.pad(now.getHours().toString(), 2);
-                            let hourly_total = dateString + hour;
-                            let active_time = -1;
-                            let steps = -1;
-
-                            // check current hour, and this is too recent, then check hour before
-                            for (let i = 0; i < 2; i++) {
-                                if (move.details.hourly_totals.hasOwnProperty(hourly_total)) {
-                                    active_time = move.details.hourly_totals[hourly_total].active_time;
-                                    steps = move.details.hourly_totals[hourly_total].steps;
-                                    break;
-                                } else {
-                                    hour--;
-                                    hour = api.pad(hour, 2).toString();
-                                    hourly_total = dateString + hour;
-                                }
-                            }
-
-
-                            if (active_time === -1 ) {
-                                // we didn't find a recent stat about the users activity
-                                msg = "Not enough information to make a decision about the users day. active_time = " + active_time + ", steps = " + steps;
-                                logger.info(msg);
-                                return callback(false, 200, "DynamoDB", msg);
-                            }
-
-                            // finally check that they are not too busy, and if so send a Telegram request
-                            if (active_time <= 400 && steps <= 300) {
-                                logger.info("User is not busy. Asking about their day... active_time = " + active_time + ", steps = " + steps);
-                                // the user is active but not too busy
-                                telegramRequest(userID, function (error, msg) {
-                                    let code = error ? 500 : 200;
-                                    return callback(error, code, "Telegram", msg); // send the function result to the caller
-                                });
-                            } else {
-                                const msg = "The user seems to be busy. We won't ask about their day for now. active_time = " + active_time + ", steps = " + steps;
-                                logger.info(msg);
-                                // We don't want to ask the user about their day at this point
-                                return callback(false, 200, "Telegram", msg);
-                            }
-
-
-
-                        });
-
                     } else {
-                        msg = "It's not the right time to ask about their day";
-                        logger.info(msg);
-                        // We don't want to ask the user about their day at this point
-                        return callback(false, 200, "Telegram", msg);
-                    } // end check for current time within window
-
-                }); // end getAwokenTime() callback
+                        ask(timestamp_midnight, awake_hours, target_hour);
+                    }
+                })
             }); // end query of Stats table
-        }; // end function ask()
+        }; // end function checkLatestMood()
+
+
+        let ask = function(timestamp_midnight, awake_hours, target_hour) {
+            let now = new Date();
+            logger.info("User is awake for " + awake_hours + " hours. The target hour is therefore " + target_hour + " hours past awake time");
+            getAwokenTime(userID, timestamp_midnight, function(awoken_time) {
+                if (!awoken_time) {
+                    msg = "askAboutDay() : time awoken is currently not available";
+                    logger.info(msg);
+                    return callback(false, 200, "DynamoDB", msg);
+                }
+
+                let awakeDate = new Date(awoken_time * 1000);
+                // add on 3/4 of a users day. This is our target start time to ask
+                let targetDate = new Date(awakeDate.getTime() + (3600000 * target_hour));
+                // get last hour to ask. This is when we guess the user will go to sleep, so don't ask after that.
+                let lastDate = new Date(awakeDate.getTime() + (3600000 * awake_hours));
+
+                logger.info ("The target Date is " + targetDate + ". The latest time to ask is at " + lastDate);
+                if ((now.getTime() >= targetDate.getTime()) && (now.getTime() <= lastDate.getTime())) {
+                    // it is a suitable time to ask about the users day
+                    // now we must check if they are not too busy, using recorded active time and steps
+                    const params = {
+                        TableName : "Moves",
+                        KeyConditionExpression : "user_id = :user_id AND timestamp_completed > :timestamp",
+                        ExpressionAttributeValues : {":user_id" : userID, ":timestamp" : parseInt(timestamp_midnight)},
+                        Limit: 1
+                    };
+
+                    // read Moves table and find recent active time and steps
+                    docClient.query(params, function(err, data) {
+                        if (err) {
+                            msg = "askAboutDay() : error reading Moves table. Error JSON: " + JSON.stringify(err,null,2);
+                            logger.error(msg);
+                            return callback(true, 500, "DynamoDB", msg);
+                        }
+                        if (data.Count < 1) {
+                            msg = "askAboutDay() : There is no move data to query for today";
+                            logger.info(msg);
+                            return callback(false, 200, "DynamoDB", msg);
+                        }
+                        let date = data.Items[0].date;
+                        let dateString = date.substr(0,4) + date.substr(5,2) + date.substr(8,2);
+                        let move = data.Items[0].info;
+                        let hour = api.pad(now.getHours().toString(), 2);
+                        let hourly_total = dateString + hour;
+                        let active_time = -1;
+                        let steps = -1;
+
+                        // check current hour, and this is too recent, then check hour before
+                        for (let i = 0; i < 2; i++) {
+                            if (move.details.hourly_totals.hasOwnProperty(hourly_total)) {
+                                active_time = move.details.hourly_totals[hourly_total].active_time;
+                                steps = move.details.hourly_totals[hourly_total].steps;
+                                break;
+                            } else {
+                                hour--;
+                                hour = api.pad(hour, 2).toString();
+                                hourly_total = dateString + hour;
+                            }
+                        }
+
+
+                        if (active_time === -1 ) {
+                            // we didn't find a recent stat about the users activity
+                            msg = "Not enough information to make a decision about the users day. active_time = " + active_time + ", steps = " + steps;
+                            logger.info(msg);
+                            return callback(false, 200, "DynamoDB", msg);
+                        }
+
+                        // finally check that they are not too busy, and if so send a Telegram request
+                        if (active_time <= 400 && steps <= 300) {
+                            logger.info("User is not busy. Asking about their day... active_time = " + active_time + ", steps = " + steps);
+                            // the user is active but not too busy
+                            telegramRequest(userID, function (error, msg) {
+                                let code = error ? 500 : 200;
+                                return callback(error, code, "Telegram", msg); // send the function result to the caller
+                            });
+                        } else {
+                            const msg = "The user seems to be busy. We won't ask about their day for now. active_time = " + active_time + ", steps = " + steps;
+                            logger.info(msg);
+                            // We don't want to ask the user about their day at this point
+                            return callback(false, 200, "Telegram", msg);
+                        }
+
+
+
+                    });
+
+                } else {
+                    msg = "It's not the right time to ask about their day";
+                    logger.info(msg);
+                    // We don't want to ask the user about their day at this point
+                    return callback(false, 200, "Telegram", msg);
+                } // end check for current time within window
+
+            }); // end getAwokenTime() callback
+        }
     });
 
 });

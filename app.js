@@ -9,6 +9,7 @@ var winston = require('winston');
 var args = require('./args');
 var fs = require('fs');
 var app = express();
+var cors = require('cors');
 
 
 
@@ -23,7 +24,7 @@ app.use(bodyParser.json());
 app.use(logger('dev'));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
-
+app.use(cors());
 
 // express-winston logger makes sense BEFORE the router.
 app.use(expressWinston.logger({

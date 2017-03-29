@@ -35,7 +35,7 @@ app.use(expressWinston.logger({
             level: args.logLevel
         }),
         new (winston.transports.File)({
-            filename: args.logPath + "/rest_app.log",
+            filename: args.logPath + "/rest_app_express.log",
             colorize: true,
             level : args.logLevel
         })
@@ -90,7 +90,7 @@ app.use(expressWinston.errorLogger({
             level : args.logLevel
         }),
         new (winston.transports.File)({
-            filename: args.logPath + "/rest_app.log",
+            filename: args.logPath + "/rest_app_express.log",
             colorize: true,
             level : args.logLevel
         })

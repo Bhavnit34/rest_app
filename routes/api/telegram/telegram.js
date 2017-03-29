@@ -360,7 +360,6 @@ function msgIDExists(chat_id, id) {
             return true;
         } else {
             IDs[chat_id].push(id);
-            logger.info(JSON.stringify(IDs, null, 2));
             return false;
         }
     } else {
@@ -416,7 +415,6 @@ function readIDsFromFile() {
         }
         logger.info("ID DATA: " + data);
         IDs = JSON.parse(data);
-        logger.info("IDs read as :" + JSON.stringify(IDs, null, 2));
     });
 }
 

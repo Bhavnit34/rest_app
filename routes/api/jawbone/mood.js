@@ -123,7 +123,6 @@ router.get('/:userId/', function(req_body, res) {
             Limit: limit
         };
 
-
         docClient.query(params, function (err, data) {
             if (err) {
                 logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));

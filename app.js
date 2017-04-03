@@ -1,15 +1,15 @@
-var express = require('express');
-var path = require('path');
-var favicon = require('serve-favicon');
-var logger = require('morgan');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
-var expressWinston = require('express-winston');
-var winston = require('winston');
-var args = require('./args');
-var fs = require('fs');
-var app = express();
-var cors = require('cors');
+let express = require('express');
+let path = require('path');
+let favicon = require('serve-favicon');
+let logger = require('morgan');
+let cookieParser = require('cookie-parser');
+let bodyParser = require('body-parser');
+let expressWinston = require('express-winston');
+let winston = require('winston');
+let args = require('./args');
+let fs = require('fs');
+let app = express();
+let cors = require('cors');
 
 
 
@@ -49,18 +49,31 @@ app.use(expressWinston.logger({
 
 // Routes
 app.use('/', require('./routes/index'));
+
+// jawbone
 app.use('/api/user', require('./routes/api/jawbone/user'));
-app.use('/api/body', require('./routes/api/jawbone/body'));
+app.use('/api/sleeps', require('./routes/api/jawbone/sleeps'));
 app.use('/api/moves', require('./routes/api/jawbone/moves'));
+app.use('/api/workouts', require('./routes/api/jawbone/workouts'));
 app.use('/api/heartrate', require('./routes/api/jawbone/heartrate'));
+app.use('/api/body', require('./routes/api/jawbone/body'));
 app.use('/api/settings', require('./routes/api/jawbone/settings'));
 app.use('/api/mood', require('./routes/api/jawbone/mood'));
-app.use('/api/sleeps', require('./routes/api/jawbone/sleeps'));
-app.use('/api/workouts', require('./routes/api/jawbone/workouts'));
+
+// stats
+app.use('/api/stats', require('./routes/api/stats/stats'));
+app.use('/api/stats/sleeps', require('./routes/api/stats/stats_sleeps'));
+app.use('/api/stats/moves', require('./routes/api/stats/stats_moves'));
+app.use('/api/stats/workouts', require('./routes/api/stats/stats_workouts'));
+app.use('/api/stats/heartrate', require('./routes/api/stats/stats_heartrate'));
+
+// telegram
 app.use('/api/telegram', require('./routes/api/telegram/telegram'));
 app.use('/api/telegram/sleeps', require('./routes/api/telegram/telegram_sleeps'));
 app.use('/api/telegram/moves', require('./routes/api/telegram/telegram_moves'));
 app.use('/api/telegram/workouts', require('./routes/api/telegram/telegram_workouts'));
+
+// weather
 app.use('/api/weather', require('./routes/api/weather/weather'));
 
 // catch 404 and forward to error handler

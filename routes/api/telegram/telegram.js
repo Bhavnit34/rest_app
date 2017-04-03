@@ -229,7 +229,7 @@ function putSleepSummary(json, callback_data, callback) {
 // function to store the users response to their day
 function putDaySummary(json, callback_data, callback) {
     let userID = "";
-    let date  = new Date(json.callback_query.message.date * 1000);
+    let date  = new Date(callback_data.timestamp * 1000);
     // Find the userID, given the chat_id
     getUserID(json.callback_query.message.chat.id, function (user) {
         if (!user) {
@@ -250,18 +250,17 @@ function putDaySummary(json, callback_data, callback) {
             };
 
 
-            // Update the Sleep row to include the mood
+            // Update the DailyMood row to include the mood
             docClient.update(params, function (err, data) {
                 if (err) {
                     logger.error("Error updating DailyMood table. Error JSON:", JSON.stringify(err, null, 2));
                     return callback("error updating mood for putDaySummary");
                 } else {
                     // now mark the message in the chat as answered, giving their answer
-                    let answer = null;
-                    // decode the emoji to display correctly on the msg
-                    if (callback_data.hasOwnProperty('answer')) {
-                        answer = decodeURIComponent(escape(callback_data.answer));
-                    }
+                    const answers = [emojis[4], emojis[3], emojis[2],emojis[1], emojis[0]];
+                    let answer = answers[callback_data.mood - 1]; // -1 as mood starts from 1
+
+
                     editMessageAsAnswered(json, answer, function(error, msg) {
                     if (error) {
                         logger.error(msg);

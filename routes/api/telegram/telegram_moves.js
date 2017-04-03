@@ -245,7 +245,7 @@ router.post('/askAboutDay', function(req,res_body){
                         if (active_time <= 400 && steps <= 300) {
                             logger.info("User is not busy. Asking about their day... active_time = " + active_time + ", steps = " + steps);
                             // the user is active but not too busy
-                            telegramRequest(userID, function (error, msg) {
+                            telegramRequest(userID, timestamp_midnight, function (error, msg) {
                                 let code = error ? 500 : 200;
                                 return callback(error, code, "Telegram", msg); // send the function result to the caller
                             });
@@ -274,29 +274,26 @@ router.post('/askAboutDay', function(req,res_body){
 });
 
 // send a message to the users chat
-function telegramRequest(userID, callback) {
+function telegramRequest(userID, timestamp, callback) {
     api.getbotDetails(userID, function(botDetails) {
         if (botDetails === null) {
             return callback(false, "We don't have the users Telegram info. No message has been sent");
         }
         let msg = "";
-        // encode emojis to UTF8 to allow them to be passed through JSON
         let emojis = ["\uD83D\uDE01", "\uD83D\uDE0A", "\uD83D\uDE0C","\uD83D\uDE14","\uD83D\uDE2B"];
-        let encoded = [];
-        for (let i = 0; i < emojis.length; i++) {
-            encoded.push(unescape(encodeURIComponent(emojis[i])));
-        }
+
+        // We want to pass timestamp_midnight to telegram so that they can store the DailyMood at the correct date
 
         const json = { "chat_id" : botDetails.chat_id,
             "text" : "How was your day today?",
             "force_reply" : "True",
             "reply_markup": {"inline_keyboard": [
                 [
-                    {"text" : emojis[0], "callback_data" : "{\"answer\": \"" + encoded[0] + "\", \"caller\": \"updateMoves\", \"mood\": 5}"},
-                    {"text" : emojis[1], "callback_data" : "{\"answer\": \"" + encoded[1] + "\", \"caller\": \"updateMoves\", \"mood\": 4}"},
-                    {"text" : emojis[2], "callback_data" : "{\"answer\": \"" + encoded[2] + "\", \"caller\": \"updateMoves\", \"mood\": 3}"},
-                    {"text" : emojis[3], "callback_data" : "{\"answer\": \"" + encoded[3] + "\", \"caller\": \"updateMoves\", \"mood\": 2}"},
-                    {"text" : emojis[4], "callback_data" : "{\"answer\": \"" + encoded[4] + "\", \"caller\": \"updateMoves\", \"mood\": 1}"}
+                    {"text" : emojis[0], "callback_data" : "{\"timestamp\": \"" + timestamp + "\", \"caller\": \"updateMoves\", \"mood\": 5}"},
+                    {"text" : emojis[1], "callback_data" : "{\"timestamp\": \"" + timestamp + "\", \"caller\": \"updateMoves\", \"mood\": 4}"},
+                    {"text" : emojis[2], "callback_data" : "{\"timestamp\": \"" + timestamp + "\", \"caller\": \"updateMoves\", \"mood\": 3}"},
+                    {"text" : emojis[3], "callback_data" : "{\"timestamp\": \"" + timestamp + "\", \"caller\": \"updateMoves\", \"mood\": 2}"},
+                    {"text" : emojis[4], "callback_data" : "{\"timestamp\": \"" + timestamp + "\", \"caller\": \"updateMoves\", \"mood\": 1}"}
                 ]
             ]}
         };

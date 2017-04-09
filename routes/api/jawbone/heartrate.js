@@ -13,7 +13,7 @@ AWS.config.update({
 var docClient = new AWS.DynamoDB.DocumentClient();
 var logger = loggerModule.getLogger();
 
-router.get('/test', function(req,res){res.send('heartrate working');});
+router.get('/test', function(req,res){res.status(200).send('heartrate working');});
 
 // function to return stored heart rate data
 router.get('/:userId/', function(req, res) {
@@ -132,7 +132,7 @@ router.get('/:userId/', function(req, res) {
                 console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
                 //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
-                res.send(JSON.stringify(data, null, 2));
+                res.status(200).send(JSON.stringify(data, null, 2));
             }
         });
     };

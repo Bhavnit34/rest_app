@@ -16,7 +16,7 @@ let docClient = new AWS.DynamoDB.DocumentClient();
 let logger = loggerModule.getLogger();
 
 
-router.get('/test', function(req,res){res.send('stats sleeps working');});
+router.get('/test', function(req,res){res.status(200).send('stats sleeps working');});
 
 // function to calculate the stats from the whole table, if these values were lost
 function calculateInitialStats(userID, callback) {

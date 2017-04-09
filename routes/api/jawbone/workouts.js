@@ -15,7 +15,7 @@ AWS.config.update({
 let docClient = new AWS.DynamoDB.DocumentClient();
 let logger = loggerModule.getLogger();
 
-router.get('/test', function(req,res){res.send('workouts working');});
+router.get('/test', function(req,res){res.status(200).send('workouts working');});
 
 // function to return stored workout data
 router.get('/:userId/', function(req,res){
@@ -124,10 +124,10 @@ router.get('/:userId/', function(req,res){
 
         docClient.query(params, function (err, data) {
             if (err) {
-                console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+                logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
-                //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
-                res.send(JSON.stringify(data, null, 2));
+                //logger.log("GetItem succeeded:", JSON.stringify(data, null, 2));
+                res.status(200).send(JSON.stringify(data, null, 2));
             }
         });
     };

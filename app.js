@@ -66,6 +66,7 @@ app.use('/api/stats/sleeps', require('./routes/api/stats/stats_sleeps'));
 app.use('/api/stats/moves', require('./routes/api/stats/stats_moves'));
 app.use('/api/stats/workouts', require('./routes/api/stats/stats_workouts'));
 app.use('/api/stats/heartrate', require('./routes/api/stats/stats_heartrate'));
+app.use('/api/stats/mood', require('./routes/api/stats/stats_mood'));
 
 // telegram
 app.use('/api/telegram', require('./routes/api/telegram/telegram'));

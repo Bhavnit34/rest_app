@@ -14,7 +14,7 @@ var docClient = new AWS.DynamoDB.DocumentClient();
 var logger = loggerModule.getLogger();
 
 router.get('/test', function(req,res){
-    res.send('body working');
+    res.status(200).send('body working');
     logger.info("logger working");
 });
 
@@ -131,7 +131,7 @@ router.get('/:userId/', function(req, res) {
                 console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
                 //console.log("GetItem succeeded:", JSON.stringify(data, null, 2));
-                res.send(JSON.stringify(data, null, 2));
+                res.status(200).send(JSON.stringify(data, null, 2));
             }
         });
     };

@@ -16,7 +16,7 @@ var logger = loggerModule.getLogger();
 
 // routes
 router.get('/test', function(req,res){
-    res.send('user working');
+    res.status(200).send('user working');
     logger.info("logger working");
 });
 
@@ -67,9 +67,9 @@ router.get('/:userId/', function(req,res){
 
         docClient.query(params, function (err, data) {
             if (err) {
-                console.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+                logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
-                res.send(JSON.stringify(data, null, 2));
+                res.status(200).send(JSON.stringify(data, null, 2));
             }
         });
     };

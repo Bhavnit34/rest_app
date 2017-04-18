@@ -51,7 +51,7 @@ function calculateInitialStats(userID, callback) {
 
                 // steps
                 let steps = data.Items[i].info.details.steps;
-                if (steps !== null) {
+                if (steps != null) {
                     Steps.totalCount++;
                     Steps.total += steps;
                     if (steps < Steps.min) {
@@ -63,9 +63,10 @@ function calculateInitialStats(userID, callback) {
 
                 // distance
                 let distance = data.Items[i].info.details.distance;
-                if (distance !== null) {
+                if (distance != null) {
                     Distance.totalCount++;
                     Distance.total += distance;
+                    logger.info("Total : " + Distance.total);
                     if (distance < Distance.min) {
                         Distance.min = distance;
                     } else if (distance > Distance.max) {
@@ -75,7 +76,7 @@ function calculateInitialStats(userID, callback) {
 
                 // calories
                 let calories = data.Items[i].info.details.calories;
-                if (calories !== null) {
+                if (calories != null) {
                     Calories.totalCount++;
                     Calories.total += calories;
                     if (calories < Calories.min) {
@@ -87,7 +88,7 @@ function calculateInitialStats(userID, callback) {
 
                 // active time
                 let activeTime = data.Items[i].info.details.active_time;
-                if (activeTime !== null) {
+                if (activeTime != null) {
                     ActiveTime.totalCount++;
                     ActiveTime.total += activeTime;
                     if (activeTime < ActiveTime.min) {
@@ -108,6 +109,7 @@ function calculateInitialStats(userID, callback) {
 
             let stats = {
                 Steps : {
+                    total: Steps.total,
                     avg: Steps.avg,
                     min: Steps.min,
                     max: Steps.max,
@@ -115,6 +117,7 @@ function calculateInitialStats(userID, callback) {
                     timestamp_updated: timestamp_updated
                 },
                 Distance : {
+                    total: Distance.total,
                     avg: Distance.avg,
                     min: Distance.min,
                     max: Distance.max,
@@ -122,13 +125,15 @@ function calculateInitialStats(userID, callback) {
                     timestamp_updated: timestamp_updated
                 },
                 Calories : {
+                    total: Calories.total,
                     avg: Calories.avg,
                     min: Calories.min,
                     max: Calories.max,
                     avg_count: Calories.totalCount,
                     timestamp_updated: timestamp_updated
                 },
-                Time : {
+                ActiveTime : {
+                    total: ActiveTime.total,
                     avg: ActiveTime.avg,
                     min: ActiveTime.min,
                     max: ActiveTime.max,
@@ -136,7 +141,7 @@ function calculateInitialStats(userID, callback) {
                     timestamp_updated: timestamp_updated
                 }
             };
-
+            logger.info("STATS" + JSON.stringify(stats, null, 2));
             return callback(stats);
         }
 
@@ -149,10 +154,10 @@ router.post('/updateStats', function(req, res) {
     let user_id = "";
     let returnJson = api.newReturnJson();
     let token = "";
-    let newStats = {Steps:{min:0, max:0, avg:0, avg_count: 0, timestamp_updated: 0},
-        Distance:{min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0},
-        Calories:{min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0},
-        ActiveTime:{min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0}};
+    let newStats = {Steps:{total: 0, min:0, max:0, avg:0, avg_count: 0, timestamp_updated: 0},
+        Distance:{total: 0, min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0},
+        Calories:{total: 0, min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0},
+        ActiveTime:{total: 0, min:0, max:0, avg:0,avg_count: 0, timestamp_updated: 0}};
 
     // check userId
     if (!req.body.userId){
@@ -227,21 +232,26 @@ router.post('/updateStats', function(req, res) {
                                 let Distance = { total: 0, totalCount : 0};
                                 let Calories = { total: 0, totalCount : 0};
                                 let ActiveTime = { total: 0, totalCount : 0};
-                                // assign local min/max to what we currently have in the stats table
+                                // assign local values to what we currently have in the stats table
+                                newStats.Steps.total = mv.Steps.total;
                                 newStats.Steps.max = mv.Steps.max;
                                 newStats.Steps.min = mv.Steps.min;
+                                newStats.Distance.total = mv.Distance.total;
                                 newStats.Distance.max = mv.Distance.max;
                                 newStats.Distance.min = mv.Distance.min;
+                                newStats.Calories.total = mv.Calories.total;
                                 newStats.Calories.max = mv.Calories.max;
                                 newStats.Calories.min = mv.Calories.min;
+                                newStats.ActiveTime.total = mv.Active_time.total;
                                 newStats.ActiveTime.max = mv.Active_time.max;
                                 newStats.ActiveTime.min = mv.Active_time.min;
 
                                 for (let i = 0; i < data.Items.length; i++) {
                                     // steps
                                     let steps = row[i].info.details.steps;
-                                    if (steps !== null) {
+                                    if (steps != null) {
                                         Steps.totalCount++;
+                                        newStats.Steps.total += steps;
                                         if (steps > newStats.Steps.max) {
                                             newStats.Steps.max = steps;
                                         } else if (steps < newStats.Steps.min) {
@@ -252,8 +262,9 @@ router.post('/updateStats', function(req, res) {
 
                                     // distance
                                     let distance = row[i].info.details.distance;
-                                    if (distance !== null) {
+                                    if (distance != null) {
                                         Distance.totalCount++;
+                                        newStats.Distance.total += distance;
                                         if (distance > newStats.Distance.max) {
                                             newStats.Distance.max = distance;
                                         } else if (distance < newStats.Distance.min) {
@@ -264,8 +275,9 @@ router.post('/updateStats', function(req, res) {
 
                                     // calories
                                     let calories = row[i].info.details.calories;
-                                    if (calories !== null) {
+                                    if (calories != null) {
                                         Calories.totalCount++;
+                                        newStats.Calories.total += calories;
                                         if (calories > newStats.Calories.max) {
                                             newStats.Calories.max = calories;
                                         } else if (calories < newStats.Calories.min) {
@@ -276,8 +288,9 @@ router.post('/updateStats', function(req, res) {
 
                                     // active time
                                     let activeTime = row[i].info.details.active_time;
-                                    if (activeTime !== null) {
+                                    if (activeTime != null) {
                                         ActiveTime.totalCount++;
+                                        newStats.ActiveTime.total += activeTime;
                                         if (activeTime > newStats.ActiveTime.max) {
                                             newStats.ActiveTime.max = activeTime;
                                         } else if (activeTime < newStats.ActiveTime.min) {
@@ -315,7 +328,7 @@ router.post('/updateStats', function(req, res) {
         // function that will write in the stats decided by checkStats()
         checkStats(function(stats){
             // end if there is nothing to update
-            if (stats == null) {
+            if (stats === null) {
                 logger.info("Moves Stats already up to date");
                 updateWeeklyStats(weeklyStatsCallback);
                 return;
@@ -330,30 +343,35 @@ router.post('/updateStats', function(req, res) {
                 UpdateExpression: "set info.Moves.Steps.#avg = :steps_avg," +
                 " info.Moves.Steps.#min = :steps_min," +
                 " info.Moves.Steps.#max = :steps_max," +
+                " info.Moves.Steps.#total = :steps_total," +
                 " info.Moves.Steps.avg_count = :steps_avg_count," +
                 " info.Moves.Steps.timestamp_updated = :steps_timestamp_updated," +
 
                 " info.Moves.Distance.#avg = :distance_avg," +
                 " info.Moves.Distance.#min = :distance_min," +
                 " info.Moves.Distance.#max = :distance_max," +
+                " info.Moves.Distance.#total = :distance_total," +
                 " info.Moves.Distance.avg_count = :distance_avg_count," +
                 " info.Moves.Distance.timestamp_updated = :distance_timestamp_updated," +
 
                 " info.Moves.Calories.#avg = :calories_avg," +
                 " info.Moves.Calories.#min = :calories_min," +
                 " info.Moves.Calories.#max = :calories_max," +
+                " info.Moves.Calories.#total = :calories_total," +
                 " info.Moves.Calories.avg_count = :calories_avg_count," +
                 " info.Moves.Calories.timestamp_updated = :calories_timestamp_updated," +
 
                 " info.Moves.Active_time.#avg = :activeTime_avg," +
                 " info.Moves.Active_time.#min = :activeTime_min," +
                 " info.Moves.Active_time.#max = :activeTime_max," +
+                " info.Moves.Active_time.#total = :activeTime_total," +
                 " info.Moves.Active_time.avg_count = :activeTime_avg_count," +
                 " info.Moves.Active_time.timestamp_updated = :activeTime_timestamp_updated",
                 ExpressionAttributeValues:{
                     // steps
                     ":steps_min": stats.Steps.min,
                     ":steps_max": stats.Steps.max,
+                    ":steps_total": stats.Steps.total,
                     ":steps_avg_count": stats.Steps.avg_count,
                     ":steps_avg": stats.Steps.avg,
                     ":steps_timestamp_updated" : parseInt(stats.Steps.timestamp_updated),
@@ -361,6 +379,7 @@ router.post('/updateStats', function(req, res) {
                     // distance
                     ":distance_min": stats.Distance.min,
                     ":distance_max": stats.Distance.max,
+                    ":distance_total": stats.Distance.total,
                     ":distance_avg_count": stats.Distance.avg_count,
                     ":distance_avg": stats.Distance.avg,
                     ":distance_timestamp_updated" : parseInt(stats.Distance.timestamp_updated),
@@ -368,6 +387,7 @@ router.post('/updateStats', function(req, res) {
                     // calories
                     ":calories_min": stats.Calories.min,
                     ":calories_max": stats.Calories.max,
+                    ":calories_total": stats.Calories.total,
                     ":calories_avg_count": stats.Calories.avg_count,
                     ":calories_avg": stats.Calories.avg,
                     ":calories_timestamp_updated" : parseInt(stats.Calories.timestamp_updated),
@@ -375,6 +395,7 @@ router.post('/updateStats', function(req, res) {
                     // active time
                     ":activeTime_min": stats.ActiveTime.min,
                     ":activeTime_max": stats.ActiveTime.max,
+                    ":activeTime_total": stats.ActiveTime.total,
                     ":activeTime_avg_count": stats.ActiveTime.avg_count,
                     ":activeTime_avg": stats.ActiveTime.avg,
                     ":activeTime_timestamp_updated" : parseInt(stats.ActiveTime.timestamp_updated)
@@ -383,6 +404,7 @@ router.post('/updateStats', function(req, res) {
                     "#avg": "avg",
                     "#min": "min",
                     "#max": "max",
+                    "#total": "total"
                 },
                 ReturnValues:"UPDATED_NEW" // give the resulting updated fields as the JSON result
 
@@ -561,25 +583,25 @@ router.post('/updateStats', function(req, res) {
                                 let move = json_res.data.items[i];
                                 if (move == null) { break ;} // end as there are less than 7 new days
                                 // steps
-                                if (move.details.steps !== null) {
+                                if (move.details.steps != null) {
                                     Steps.total += move.details.steps;
                                     Steps.totalCount++;
                                 }
 
                                 // distance
-                                if (move.details.distance !== null) {
+                                if (move.details.distance != null) {
                                     Distance.total += move.details.distance;
                                     Distance.totalCount++;
                                 }
 
                                 // calories
-                                if (move.details.calories !== null) {
+                                if (move.details.calories != null) {
                                     Calories.total += move.details.calories;
                                     Calories.totalCount++;
                                 }
 
                                 // active time
-                                if (move.details.active_time !== null) {
+                                if (move.details.active_time != null) {
                                     ActiveTime.total += move.details.active_time;
                                     ActiveTime.totalCount++;
                                 }

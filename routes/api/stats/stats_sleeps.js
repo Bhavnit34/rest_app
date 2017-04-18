@@ -116,7 +116,7 @@ function calculateInitialStats(userID, callback) {
                         // skip this day, it's the same as today
                         j++;
                     } else {
-                        let next_day = new Date((row.timestamp_completed * 1000) + 86400000);
+                        let next_day = new Date((this_row.timestamp_completed * 1000) + 86400000);
                         let next_row_day = new Date(next_row.timestamp_completed * 1000);
                         if ((next_day.getDate() == next_row_day.getDate())
                             && (next_day.getMonth() == next_row_day.getMonth())
@@ -255,6 +255,7 @@ function calculateInitialStats(userID, callback) {
 
             let stats = {
                 AwakeDuration: {
+                    total: AwakeDuration.total,
                     avg: AwakeDuration.avg,
                     min: AwakeDuration.min,
                     max: AwakeDuration.max,
@@ -262,16 +263,19 @@ function calculateInitialStats(userID, callback) {
                     timestamp_updated: timestamp_updated
                 },
                 AwakeTime : {
+                    total: AwakeTime.total,
                     avg: AwakeTime.avg,
                     avg_count: AwakeTime.totalCount,
                     timestamp_updated: timestamp_updated
                 },
                 AsleepTime : {
+                    total: AsleepTime.total,
                     avg: AsleepTime.avg,
                     avg_count: AsleepTime.totalCount,
                     timestamp_updated: timestamp_updated
                 },
                 Light : {
+                    total: Light.total,
                     avg: Light.avg,
                     min: Light.min,
                     max: Light.max,
@@ -279,6 +283,7 @@ function calculateInitialStats(userID, callback) {
                     timestamp_updated: timestamp_updated
                 },
                 REM : {
+                    total: REM.total,
                     avg: REM.avg,
                     min: REM.min,
                     max: REM.max,
@@ -286,6 +291,7 @@ function calculateInitialStats(userID, callback) {
                     timestamp_updated: timestamp_updated
                 },
                 Deep : {
+                    total: Deep.total,
                     avg: Deep.avg,
                     min: Deep.min,
                     max: Deep.max,
@@ -293,6 +299,7 @@ function calculateInitialStats(userID, callback) {
                     timestamp_updated: timestamp_updated
                 },
                 Duration : {
+                    total: Duration.total,
                     avg: Duration.avg,
                     min: Duration.min,
                     max: Duration.max,
@@ -315,13 +322,13 @@ router.post('/updateStats', function(req, res) {
     let returnJson = api.newReturnJson();
     let token = "";
     let newStats = {
-        AwakeDuration : {avg : 0, min: 0, max: 0, avg_count : 0, timestamp_updated : 0},
-        AwakeTime: {avg: 0, avg_count: 0, timestamp_updated: 0},
-        AsleepTime: {avg: 0, avg_count: 0, timestamp_updated: 0},
-        Light: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
-        REM: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
-        Deep: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
-        Duration: {min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0}
+        AwakeDuration : {total: 0, avg : 0, min: 0, max: 0, avg_count : 0, timestamp_updated : 0},
+        AwakeTime: {total: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
+        AsleepTime: {total: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
+        Light: {total: 0, min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
+        REM: {total: 0, min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
+        Deep: {total: 0, min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0},
+        Duration: {total: 0, min: 0, max: 0, avg: 0, avg_count: 0, timestamp_updated: 0}
     };
 
     // check userId
@@ -405,17 +412,22 @@ router.post('/updateStats', function(req, res) {
                                 let Duration = {total: 0, totalCount: 0};
 
 
-                                // assign local min/max to what we currently have in the stats table
+                                // assign local values to what we currently have in the stats table
                                 newStats.AwakeDuration.max = sleep.AwakeDuration.max;
                                 newStats.AwakeDuration.min = sleep.AwakeDuration.min;
+                                newStats.AwakeDuration.total = sleep.AwakeDuration.total;
                                 newStats.Light.max = sleep.Light.max;
                                 newStats.Light.min = sleep.Light.min;
+                                newStats.Light.total = sleep.Light.total;
                                 newStats.REM.max = sleep.REM.max;
                                 newStats.REM.min = sleep.REM.min;
+                                newStats.REM.total = sleep.REM.total;
                                 newStats.Deep.max = sleep.Deep.max;
                                 newStats.Deep.min = sleep.Deep.min;
+                                newStats.Deep.total = sleep.Deep.total;
                                 newStats.Duration.max = sleep.Duration.max;
                                 newStats.Duration.min = sleep.Duration.min;
+                                newStats.Duration.total = sleep.Duration.total;
 
                                 for(let i = 0; i < data.Items.length; i++) {
                                     // loop through each row and cumulate the average
@@ -535,6 +547,7 @@ router.post('/updateStats', function(req, res) {
                                         if (asleep_time > 43200) {asleep_time = asleep_time - 86400;}
                                         AsleepTime.totalCount++;
                                         AsleepTime.total += asleep_time;
+                                        newStats.AsleepTime.total += asleep_time;
                                     }
 
 
@@ -547,6 +560,7 @@ router.post('/updateStats', function(req, res) {
                                             let awake_duration = next_asleep - awake;
                                             AwakeDuration.totalCount++;
                                             AwakeDuration.total += awake_duration;
+                                            newStats.AwakeDuration.total += awake_duration;
                                             if (awake_duration < AwakeDuration.min) {
                                                 AwakeDuration.min = awake_duration;
                                             } else if (awake_duration > AwakeDuration.max) {
@@ -561,6 +575,7 @@ router.post('/updateStats', function(req, res) {
                                     if (light != null) {
                                         Light.totalCount++;
                                         Light.total += light;
+                                        newStats.Light.total += light;
                                         if (light < Light.min) {
                                             Light.min = light;
                                         } else if (light > Light.max) {
@@ -573,6 +588,7 @@ router.post('/updateStats', function(req, res) {
                                     if (rem != null) {
                                         REM.totalCount++;
                                         REM.total += rem;
+                                        newStats.REM.total += rem;
                                         if (rem < REM.min) {
                                             REM.min = rem;
                                         } else if (rem > REM.max) {
@@ -585,6 +601,7 @@ router.post('/updateStats', function(req, res) {
                                     if (deep != null) {
                                         Deep.totalCount++;
                                         Deep.total += deep;
+                                        newStats.Deep.total += deep;
                                         if (deep < Deep.min) {
                                             Deep.min = deep;
                                         } else if (deep > Deep.max) {
@@ -597,6 +614,7 @@ router.post('/updateStats', function(req, res) {
                                     if (duration != null) {
                                         Duration.totalCount++;
                                         Duration.total += duration;
+                                        newStats.Duration.total += duration;
                                         if (duration < Duration.min) {
                                             Duration.min = duration;
                                         } else if (duration > Duration.max) {
@@ -649,7 +667,7 @@ router.post('/updateStats', function(req, res) {
         // function that will write in the stats decided by checkStats()
         checkStats(function (stats) {
             // end if there is nothing to update
-            if (stats == null) {
+            if (stats === null) {
                 logger.info("Sleep Stats already up to date");
                 updateWeeklyStats(weeklyStatsCallback);
                 return;
@@ -661,40 +679,47 @@ router.post('/updateStats', function(req, res) {
                 TableName: "Stats",
                 Key: {"user_id": user_id},
                 UpdateExpression: "set info.Sleep.AwakeTime.#avg = :AwakeTime_avg," +
+                " info.Sleep.AwakeTime.#total = :AwakeTime_total," +
                 " info.Sleep.AwakeTime.avg_count = :AwakeTime_avg_count," +
                 " info.Sleep.AwakeTime.timestamp_updated = :AwakeTime_timestamp_updated," +
 
                 " info.Sleep.AsleepTime.#avg = :AsleepTime_avg," +
+                " info.Sleep.AsleepTime.#total = :AsleepTime_total," +
                 " info.Sleep.AsleepTime.avg_count = :AsleepTime_avg_count," +
                 " info.Sleep.AsleepTime.timestamp_updated = :AsleepTime_timestamp_updated," +
 
                 " info.Sleep.AwakeDuration.#avg = :AwakeDuration_avg," +
                 " info.Sleep.AwakeDuration.#min = :AwakeDuration_min," +
                 " info.Sleep.AwakeDuration.#max = :AwakeDuration_max," +
+                " info.Sleep.AwakeDuration.#total = :AwakeDuration_total," +
                 " info.Sleep.AwakeDuration.avg_count = :AwakeDuration_avg_count," +
                 " info.Sleep.AwakeDuration.timestamp_updated = :AwakeDuration_timestamp_updated," +
 
                 " info.Sleep.Light.#avg = :Light_avg," +
                 " info.Sleep.Light.#min = :Light_min," +
                 " info.Sleep.Light.#max = :Light_max," +
+                " info.Sleep.Light.#total = :Light_total," +
                 " info.Sleep.Light.avg_count = :Light_avg_count," +
                 " info.Sleep.Light.timestamp_updated = :Light_timestamp_updated," +
 
                 " info.Sleep.REM.#avg = :REM_avg," +
                 " info.Sleep.REM.#min = :REM_min," +
                 " info.Sleep.REM.#max = :REM_max," +
+                " info.Sleep.REM.#total = :REM_total," +
                 " info.Sleep.REM.avg_count = :REM_avg_count," +
                 " info.Sleep.REM.timestamp_updated = :REM_timestamp_updated," +
 
                 " info.Sleep.Deep.#avg = :Deep_avg," +
                 " info.Sleep.Deep.#min = :Deep_min," +
                 " info.Sleep.Deep.#max = :Deep_max," +
+                " info.Sleep.Deep.#total = :Deep_total," +
                 " info.Sleep.Deep.avg_count = :Deep_avg_count," +
                 " info.Sleep.Deep.timestamp_updated = :Deep_timestamp_updated," +
 
                 " info.Sleep.#Duration.#avg = :Duration_avg," +
                 " info.Sleep.#Duration.#min = :Duration_min," +
                 " info.Sleep.#Duration.#max = :Duration_max," +
+                " info.Sleep.#Duration.#total = :Duration_total," +
                 " info.Sleep.#Duration.avg_count = :Duration_avg_count," +
                 " info.Sleep.#Duration.timestamp_updated = :Duration_timestamp_updated",
 
@@ -703,16 +728,19 @@ router.post('/updateStats', function(req, res) {
                     // awake time
                     ":AwakeTime_avg_count": stats.AwakeTime.avg_count,
                     ":AwakeTime_avg": stats.AwakeTime.avg,
+                    ":AwakeTime_total": stats.AwakeTime.total,
                     ":AwakeTime_timestamp_updated": parseInt(stats.AwakeTime.timestamp_updated),
 
                     // asleep time
                     ":AsleepTime_avg_count": stats.AsleepTime.avg_count,
                     ":AsleepTime_avg": stats.AsleepTime.avg,
+                    ":AsleepTime_total": stats.AsleepTime.total,
                     ":AsleepTime_timestamp_updated": parseInt(stats.AsleepTime.timestamp_updated),
 
                     // awake duration
                     ":AwakeDuration_min": stats.AwakeDuration.min,
                     ":AwakeDuration_max": stats.AwakeDuration.max,
+                    ":AwakeDuration_total": stats.AwakeDuration.total,
                     ":AwakeDuration_avg_count": stats.AwakeDuration.avg_count,
                     ":AwakeDuration_avg": stats.AwakeDuration.avg,
                     ":AwakeDuration_timestamp_updated": parseInt(stats.AwakeDuration.timestamp_updated),
@@ -720,6 +748,7 @@ router.post('/updateStats', function(req, res) {
                     // light
                     ":Light_min": stats.Light.min,
                     ":Light_max": stats.Light.max,
+                    ":Light_total": stats.Light.total,
                     ":Light_avg_count": stats.Light.avg_count,
                     ":Light_avg": stats.Light.avg,
                     ":Light_timestamp_updated": parseInt(stats.Light.timestamp_updated),
@@ -727,6 +756,7 @@ router.post('/updateStats', function(req, res) {
                     // REM
                     ":REM_min": stats.REM.min,
                     ":REM_max": stats.REM.max,
+                    ":REM_total": stats.REM.total,
                     ":REM_avg_count": stats.REM.avg_count,
                     ":REM_avg": stats.REM.avg,
                     ":REM_timestamp_updated": parseInt(stats.REM.timestamp_updated),
@@ -734,6 +764,7 @@ router.post('/updateStats', function(req, res) {
                     // deep
                     ":Deep_min": stats.Deep.min,
                     ":Deep_max": stats.Deep.max,
+                    ":Deep_total": stats.Deep.total,
                     ":Deep_avg_count": stats.Deep.avg_count,
                     ":Deep_avg": stats.Deep.avg,
                     ":Deep_timestamp_updated": parseInt(stats.Deep.timestamp_updated),
@@ -741,6 +772,7 @@ router.post('/updateStats', function(req, res) {
                     // duration
                     ":Duration_min": stats.Duration.min,
                     ":Duration_max": stats.Duration.max,
+                    ":Duration_total": stats.Duration.total,
                     ":Duration_avg_count": stats.Duration.avg_count,
                     ":Duration_avg": stats.Duration.avg,
                     ":Duration_timestamp_updated": parseInt(stats.Duration.timestamp_updated)
@@ -749,7 +781,8 @@ router.post('/updateStats', function(req, res) {
                     "#avg": "avg",
                     "#min": "min",
                     "#max": "max",
-                    "#Duration" : "Duration"
+                    "#Duration" : "Duration",
+                    "#total" : "total"
                 },
                 ReturnValues: "UPDATED_NEW" // give the resulting updated fields as the JSON result
 
@@ -1027,7 +1060,7 @@ router.post('/updateStats', function(req, res) {
 
                                 // awake time
                                 let awake = data.Items[i].info.details.awake_time;
-                                if (awake !== null) {
+                                if (awake != null) {
                                     let awakeDate = new Date(awake * 1000);
                                     let awakeStart = new Date(awake * 1000);
                                     awakeStart.setHours(0,0,0,0);
@@ -1040,7 +1073,7 @@ router.post('/updateStats', function(req, res) {
 
                                 // asleep time
                                 let asleep = data.Items[i].info.details.asleep_time;
-                                if (asleep !== null) {
+                                if (asleep != null) {
                                     // calculate time in seconds, we don't want the whole timestamp
                                     let asleepDate = new Date(asleep * 1000);
                                     let asleepStart = new Date(asleep * 1000);
@@ -1057,7 +1090,7 @@ router.post('/updateStats', function(req, res) {
                                 if (SleepDurationAvailable && ((i) <  data.Items.length)) {
                                     let next_row = data.Items[index_next_day];
                                     let next_asleep = next_row.info.details.asleep_time;
-                                    if (next_asleep !== null && awake !== null) {
+                                    if (next_asleep != null && awake != null) {
                                         let awake_duration = next_asleep - awake;
                                         AwakeDuration.totalCount++;
                                         AwakeDuration.total += awake_duration;
@@ -1067,28 +1100,28 @@ router.post('/updateStats', function(req, res) {
 
                                 // light
                                 let light = data.Items[i].info.details.light;
-                                if (light !== null) {
+                                if (light != null) {
                                     Light.totalCount++;
                                     Light.total += light;
                                 }
 
                                 // rem
                                 let rem = data.Items[i].info.details.rem;
-                                if (rem !== null) {
+                                if (rem != null) {
                                     REM.totalCount++;
                                     REM.total += rem;
                                 }
 
                                 // deep
                                 let deep = data.Items[i].info.details.sound;
-                                if (deep !== null) {
+                                if (deep != null) {
                                     Deep.totalCount++;
                                     Deep.total += deep;
                                 }
 
                                 // duration
                                 let duration = data.Items[i].info.details.duration;
-                                if (duration !== null) {
+                                if (duration != null) {
                                     Duration.totalCount++;
                                     Duration.total += duration;
                                 }

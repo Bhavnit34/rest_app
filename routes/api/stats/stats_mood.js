@@ -41,7 +41,7 @@ function calculateInitialStats(userID, callback) {
 
                 // loop through each row and cumliate the average
                 let mood = data.Items[i].mood;
-                if (mood !== null) {
+                if (mood != null) {
                     totalCount++;
                     total += mood;
                 }

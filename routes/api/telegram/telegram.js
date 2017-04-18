@@ -4,7 +4,7 @@ let router = express.Router();
 let https = require('https');
 let request = require('request');
 let loggerModule = require('../../logger');
-var api = require('../api');
+let api = require('../api');
 let fs = require('fs');
 // AWS Dependencies
 let AWS = require('aws-sdk');
@@ -16,7 +16,6 @@ const docClient = new AWS.DynamoDB.DocumentClient();
 const logger = loggerModule.getLogger();
 const botAPI = "378664495:AAGebJUO0FdqwdhpATtf-QP0cEEloH7TGNk";
 let emojis = ["\uD83D\uDE01", "\uD83D\uDE0A", "\uD83D\uDE0C","\uD83D\uDE14","\uD83D\uDE2B"];
-let msgID = 0;
 let IDs = {};
 
 // read in the stored json of handled IDs

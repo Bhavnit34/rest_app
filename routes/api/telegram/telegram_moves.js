@@ -90,7 +90,12 @@ router.post('/askAboutDay', function(req,res_body){
         token = req.body.token;
     }
 
-    api.authenticateToken(token, userID, function() {
+    api.authenticateToken(token, userID, function(authenticated) {
+        if (authenticated === false) {
+            return callback(true, 401, "DynamoDB", "Authentication Failed!");
+        }
+
+
         let move = {};
         // retrieve the latest move
         let today = new Date();

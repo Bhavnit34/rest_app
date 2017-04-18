@@ -77,6 +77,8 @@ app.use('/api/telegram/workouts', require('./routes/api/telegram/telegram_workou
 // weather
 app.use('/api/weather', require('./routes/api/weather/weather'));
 
+
+
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
   var err = new Error('Not Found');

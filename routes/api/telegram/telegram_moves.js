@@ -18,7 +18,7 @@ const logger = loggerModule.getLogger();
 function checkMoodExists(userID, timestamp, callback) {
     const params = {
         TableName : "DailyMood",
-        KeyConditionExpression: "user_id = :user_id AND timestamp_completed > :timestamp",
+        KeyConditionExpression: "user_id = :user_id AND timestamp_completed >= :timestamp",
         ExpressionAttributeValues: {
             ":user_id" : userID,
             ":timestamp" : timestamp

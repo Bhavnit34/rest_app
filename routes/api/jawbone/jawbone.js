@@ -20,7 +20,6 @@ router.get('/getAllData', function(req, res_body) {
     let attr = "";
     let user_id = "";
     let returnJson = api.newReturnJson();
-    let attrValues = {};
     let token = "";
     let msg = "";
 
@@ -69,6 +68,7 @@ router.get('/getAllData', function(req, res_body) {
                 msg = "Could not scan table: " + attr;
                 returnJson.Jawbone.error = true;
                 returnJson.Jawbone.message = msg;
+                logger.error("getAllData(" + attr + ") : JSON.stringify(err, null, 2)");
                 return callback(true, 500, "DynamoDB", JSON.stringify(err, null, 2));
             }
 

@@ -87,7 +87,7 @@ router.post('/updateStats', function(req, res) {
     }
 
     // continue only if token is authenticated
-    api.authenticateToken(token, user_id, function(authenticated) {
+    api.authenticateToken(token, user_id, false, function(authenticated) {
         if(!authenticated) {
             returnJson.Jawbone.message = "Authentication Failed!";
             returnJson.Jawbone.error = true;

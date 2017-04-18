@@ -27,7 +27,7 @@ router.get('/:userId/', function(req, res) {
     let token = "";
 
     // check for passed userID
-    if (!req.params.userId){
+    if (!req.query.userId){
         returnJson.DynamoDB.message = "User ID missing!";
         returnJson.DynamoDB.error = true;
         return res.status(400).send(returnJson);
@@ -45,7 +45,7 @@ router.get('/:userId/', function(req, res) {
     }
 
     // continue only if token is authenticated
-    api.authenticateToken(token, user_id, function(authenticated) {
+    api.authenticateToken(token, user_id, false, function(authenticated) {
 
         if (authenticated === false) {
             returnJson.DynamoDB.message = "Authenication Failed";
@@ -87,7 +87,7 @@ router.get('/weeklyStats/:userId/', function(req, res) {
     let token = "";
 
     // check for passed userID
-    if (!req.params.userId){
+    if (!req.query.userId){
         returnJson.DynamoDB.message = "User ID missing!";
         returnJson.DynamoDB.error = true;
         return res.status(400).send(returnJson);
@@ -105,7 +105,7 @@ router.get('/weeklyStats/:userId/', function(req, res) {
     }
 
     // continue only if token is authenticated
-    api.authenticateToken(token, user_id, function(authenticated) {
+    api.authenticateToken(token, user_id, false, function(authenticated) {
 
         if (authenticated === false) {
             returnJson.DynamoDB.message = "Authenication Failed";

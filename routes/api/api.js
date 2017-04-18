@@ -74,7 +74,7 @@ module.exports = {
     },
 
     // checks that the input token matches the one in the DB for a given user
-    authenticateToken: function(token, user_id, callback_proceed) {
+    authenticateToken: function(token, user_id, admin_required, callback_proceed) {
         var hashedToken = sha1(token);
         // Retrieve data from db
         var params = {
@@ -90,10 +90,18 @@ module.exports = {
             if (err) {
                 logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
             } else {
-                if (data.Items[0].token_hash === hashedToken){
-                    return callback_proceed(true);
-                } else {
+                if (data.Items[0].token_hash !== hashedToken){
                     return callback_proceed(false);
+                }
+
+                if (admin_required) {
+                    if (data.Items[0].admin === true) {
+                        return callback_proceed(true);
+                    } else {
+                        return callback_proceed(false);
+                    }
+                } else {
+                    return callback_proceed(true);
                 }
             }
         });

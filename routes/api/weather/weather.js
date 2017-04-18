@@ -46,7 +46,7 @@ router.post('/updateWorkoutWeather', function(req,res_body){
         token = req.body.token;
     }
 
-    api.authenticateToken(token, userID, function() {
+    api.authenticateToken(token, userID, false, function() {
         // retrieve the latest workout
         let workout = {};
         let today = new Date();

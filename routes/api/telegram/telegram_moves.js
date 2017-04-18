@@ -90,7 +90,7 @@ router.post('/askAboutDay', function(req,res_body){
         token = req.body.token;
     }
 
-    api.authenticateToken(token, userID, function(authenticated) {
+    api.authenticateToken(token, userID, false, function(authenticated) {
         if (authenticated === false) {
             return callback(true, 401, "DynamoDB", "Authentication Failed!");
         }

@@ -48,7 +48,7 @@ router.post('/askAboutWorkout', function(req,res_body){
     }
 
     // authenticate before proceeding
-    api.authenticateToken(token,userID,function() {
+    api.authenticateToken(token,userID,false,function() {
         let workout = {};
         // retrieve the latest workout
         let today = new Date();

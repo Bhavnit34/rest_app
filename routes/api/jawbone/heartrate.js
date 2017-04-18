@@ -2,7 +2,7 @@
 var express = require('express');
 var router = express.Router();
 var https = require('https');
-var api = require('./../api');
+var api = require('../api');
 var loggerModule = require('../../logger');
 // AWS Dependencies
 var AWS = require("aws-sdk");
@@ -138,7 +138,7 @@ router.get('/:userId/', function(req, res) {
     };
 
     // continue only if token is authenticated
-    api.authenticateToken(token, user_id, proceed);
+    api.authenticateToken(token, user_id, false, proceed);
 
 });
 

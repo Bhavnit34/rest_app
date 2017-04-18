@@ -133,7 +133,7 @@ router.get('/:userId/', function(req,res){
     };
 
     // continue only if token is authenticated
-    api.authenticateToken(token, user_id, proceed);
+    api.authenticateToken(token, user_id, false, proceed);
 
 });
 

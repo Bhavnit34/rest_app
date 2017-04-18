@@ -51,6 +51,7 @@ app.use(expressWinston.logger({
 app.use('/', require('./routes/index'));
 
 // jawbone
+app.use('/api/jawbone', require('./routes/api/jawbone/jawbone'));
 app.use('/api/user', require('./routes/api/jawbone/user'));
 app.use('/api/sleeps', require('./routes/api/jawbone/sleeps'));
 app.use('/api/moves', require('./routes/api/jawbone/moves'));

@@ -72,7 +72,7 @@ router.post('/askAboutSleep', function(req,res_body){
     }
 
     // authenticate before proceeding
-    api.authenticateToken(token,userID,function() {
+    api.authenticateToken(token,userID,false,function() {
         let sleep = {};
         // retrieve the latest sleep
         let today = new Date();

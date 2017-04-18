@@ -27,7 +27,7 @@ router.get('/:userId/', function(req, res) {
     let token = "";
 
     // check for passed userID
-    if (!req.query.userId){
+    if (!req.params.userId){
         returnJson.DynamoDB.message = "User ID missing!";
         returnJson.DynamoDB.error = true;
         return res.status(400).send(returnJson);
@@ -87,7 +87,7 @@ router.get('/weeklyStats/:userId/', function(req, res) {
     let token = "";
 
     // check for passed userID
-    if (!req.query.userId){
+    if (!req.params.userId){
         returnJson.DynamoDB.message = "User ID missing!";
         returnJson.DynamoDB.error = true;
         return res.status(400).send(returnJson);

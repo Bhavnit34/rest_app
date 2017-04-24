@@ -95,10 +95,14 @@ router.post('/new-message', function(req,res_body) {
         }
 
         if(json.message.hasOwnProperty("text")) {
+            console.log("It has a text property...");
             let text = json.message.text;
             text = text.toLowerCase();
             if (text.indexOf("average") > -1) {
+                console.log("It has average in it. calling function...");
                 sendWeeklyStats(json);
+            } else {
+                msg = "Nothing to do.";
             }
         }
         callbackMessage(chat_id, msg);
@@ -338,7 +342,7 @@ function sendWeeklyStats(json) {
     let userID = "";
     let msg = "";
     // Find the userID, given the chat_id
-    getUserID(json.callback_query.message.chat.id, function (user) {
+    getUserID(json.message.chat.id, function (user) {
         if (!user) {
             logger.error("sendWeeklyStats() : Unable to read User item.");
             return callback("error finding User for sendWeeklyStats()");
@@ -356,12 +360,12 @@ function sendWeeklyStats(json) {
             // the 10 digit timestamp of the sunday
             let date = parseInt(sunday.getTime().toString().substr(0,10));
             // the date to be read in the logs
-            let dateString = sunday.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+            let dateString = sunday.toString().split(" ").slice(0,4).join(" ");
 
 
             const params = {
                 TableName : "WeeklyStats",
-                Key: {"user_id": userID, "timestamp_weektStart" : date},
+                Key: {"user_id": userID, "timestamp_weekStart" : date},
             };
 
             // Get the latest weekly stats info from the DB
@@ -369,7 +373,7 @@ function sendWeeklyStats(json) {
                 if (err) {
                     msg = "sendWeeklyStats() : Error reading WeeklyStats for Workouts table. Error JSON:" +  JSON.stringify(err, null, 2);
                     logger.error(msg);
-                    return callback("Error reading latest weekly stats");
+                    return;
                 } else {
                     // take in some important weekly stats information
                     let stats = data.Item.info;
@@ -387,7 +391,7 @@ function sendWeeklyStats(json) {
                     let wo_calories = stats.Workouts.Calories.avg;
 
                     // present this in human-friendly form
-                    let text = "Some of your important stats for week beginning " + dateString + "\n\n " +
+                    let text = "Some of your important *averages* for week beginning " + dateString + ":\n\n " +
                         "HR : " + HR + "\n " +
                         "Cal. Burned : " + calories + "\n " +
                         "Steps : " + steps + "\n " +
@@ -395,7 +399,7 @@ function sendWeeklyStats(json) {
                         "Deep Sleep : " + deep + "\n " +
                         "REM Sleep : " + REM + "\n " +
                         "Light Sleep : " + light + "\n " +
-                        "Workouts completed : " + wo_count + "\n " +
+                        "Total Workouts completed : " + wo_count + "\n " +
                         "Cal. Burned During Workouts : " + wo_calories;
 
                     logger.info(text);
@@ -404,7 +408,8 @@ function sendWeeklyStats(json) {
                     let chat_id = json.message.chat.id;
                     let jsonMessage = {
                         "chat_id" : chat_id,
-                        "text" : text
+                        "text" : text,
+                        "parse_mode" : "Markdown"
                     };
 
                     // send this message to the user
@@ -412,7 +417,8 @@ function sendWeeklyStats(json) {
                         if (err) {
                             msg = "sendWeeklyStats() : error sending Telegram message. " + message;
                             logger.error(msg);
-                            return callback("error")
+                            return;
+
                         }
                     })
 

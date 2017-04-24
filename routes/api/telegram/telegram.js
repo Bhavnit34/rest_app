@@ -93,6 +93,14 @@ router.post('/new-message', function(req,res_body) {
             msg = "I've already replied to that";
            
         }
+
+        if(json.message.hasOwnProperty("text")) {
+            let text = json.message.text;
+            text = text.toLowerCase();
+            if (text.indexOf("average") > -1) {
+                sendWeeklyStats(json);
+            }
+        }
         callbackMessage(chat_id, msg);
         return;
 
@@ -135,7 +143,7 @@ router.post('/new-message', function(req,res_body) {
 });
 
 // function to send a message to the user
-let sendTelegramMessage = function(userID, json, callback){
+let sendTelegramMessage = function(json, callback){
         request({
             url: 'https://api.telegram.org/bot' + botAPI + '/' + 'sendMessage',
             method: "POST",
@@ -323,6 +331,104 @@ function putWorkoutSummary(json, callback_data, callback) {
 
         }
     });
+}
+
+// function to send the user their requested weekly stats values
+function sendWeeklyStats(json) {
+    let userID = "";
+    let msg = "";
+    // Find the userID, given the chat_id
+    getUserID(json.callback_query.message.chat.id, function (user) {
+        if (!user) {
+            logger.error("sendWeeklyStats() : Unable to read User item.");
+            return callback("error finding User for sendWeeklyStats()");
+        } else {
+            userID = user;
+            // get the timestamp of the latest Sunday
+            let sunday = new Date();
+            sunday.setHours(0,0,0,0);
+            while (sunday.getDay() !== 0) { // 0 = Sunday
+                sunday = new Date(sunday.getTime() - 86400000); // i.e. minus one day
+                if (sunday.getHours() === 23) {
+                    sunday = new Date(sunday.getTime() + 3600000); // add 1 hour if it goes into DST
+                }
+            }
+            // the 10 digit timestamp of the sunday
+            let date = parseInt(sunday.getTime().toString().substr(0,10));
+            // the date to be read in the logs
+            let dateString = sunday.toString().split(" ").slice(0,4).join(" ") + " (" + date + ")";
+
+
+            const params = {
+                TableName : "WeeklyStats",
+                Key: {"user_id": userID, "timestamp_weektStart" : date},
+            };
+
+            // Get the latest weekly stats info from the DB
+            docClient.get(params, function (err, data) {
+                if (err) {
+                    msg = "sendWeeklyStats() : Error reading WeeklyStats for Workouts table. Error JSON:" +  JSON.stringify(err, null, 2);
+                    logger.error(msg);
+                    return callback("Error reading latest weekly stats");
+                } else {
+                    // take in some important weekly stats information
+                    let stats = data.Item.info;
+                    let HR = stats.HeartRate.avg;
+                    // moves
+                    let calories = stats.Moves.Calories.avg;
+                    let steps = stats.Moves.Steps.avg;
+                    // sleeps
+                    let sleep_duration = calculateTime(stats.Sleep.Duration.avg);
+                    let deep = calculateTime(stats.Sleep.Deep.avg);
+                    let REM = calculateTime(stats.Sleep.REM.avg);
+                    let light = calculateTime(stats.Sleep.Light.avg);
+                    // workouts
+                    let wo_count = stats.Workouts.Count.count;
+                    let wo_calories = stats.Workouts.Calories.avg;
+
+                    // present this in human-friendly form
+                    let text = "Some of your important stats for week beginning " + dateString + "\n\n " +
+                        "HR : " + HR + "\n " +
+                        "Cal. Burned : " + calories + "\n " +
+                        "Steps : " + steps + "\n " +
+                        "Hours Slept : " + sleep_duration + "\n " +
+                        "Deep Sleep : " + deep + "\n " +
+                        "REM Sleep : " + REM + "\n " +
+                        "Light Sleep : " + light + "\n " +
+                        "Workouts completed : " + wo_count + "\n " +
+                        "Cal. Burned During Workouts : " + wo_calories;
+
+                    logger.info(text);
+
+
+                    let chat_id = json.message.chat.id;
+                    let jsonMessage = {
+                        "chat_id" : chat_id,
+                        "text" : text
+                    };
+
+                    // send this message to the user
+                    sendTelegramMessage(jsonMessage, function(err, message) {
+                        if (err) {
+                            msg = "sendWeeklyStats() : error sending Telegram message. " + message;
+                            logger.error(msg);
+                            return callback("error")
+                        }
+                    })
+
+
+                }
+            });
+
+        }
+    });
+}
+
+// function to return seconds into hours and minutes
+function calculateTime(seconds) {
+    let hours = Math.floor(seconds / 3600);
+    let mins = Math.round((seconds - (hours * 3600)) / 60);
+    return (hours + "h " + mins + "m");
 }
 
 

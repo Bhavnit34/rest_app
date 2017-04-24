@@ -75,7 +75,7 @@ router.post('/new-message', function(req,res_body) {
     // check if message was a standalone user message
     if (json.hasOwnProperty('message')) {
         let msg = "";
-        chat_id = json.message.chat.id;
+        let chat_id = json.message.chat.id;
 
         // check if the message was a reply
         if (json.message.hasOwnProperty('reply_to_message')) {
@@ -85,13 +85,6 @@ router.post('/new-message', function(req,res_body) {
                 msg = "You've already replied to that message";
                 logger.info("response to handled message detected");
             }
-        }
-        // handle message ID
-        if (msgIDExists(chat_id, json.message.message_id)) {
-            // avoid duplicate messages
-            logger.info("duplicate response detected");
-            msg = "I've already replied to that";
-           
         }
 
         if(json.message.hasOwnProperty("text")) {
@@ -363,20 +356,39 @@ function sendWeeklyStats(json) {
             let dateString = sunday.toString().split(" ").slice(0,4).join(" ");
 
 
-            const params = {
+            let params = {
                 TableName : "WeeklyStats",
-                Key: {"user_id": userID, "timestamp_weekStart" : date},
+                KeyConditionExpression: "user_id = :user_id AND timestamp_weekStart = :timestamp",
+                ExpressionAttributeValues : {":user_id" : userID, ":timestamp" : date},
+                Limit: 1
             };
 
             // Get the latest weekly stats info from the DB
-            docClient.get(params, function (err, data) {
+            docClient.query(params, function (err, data) {
                 if (err) {
                     msg = "sendWeeklyStats() : Error reading WeeklyStats for Workouts table. Error JSON:" +  JSON.stringify(err, null, 2);
                     logger.error(msg);
                     return;
                 } else {
+                    console.log("WeeklyStats: " + JSON.stringify(data, null, 2));
+                    if (data.Count === 0) {
+                        logger.info("sendWeeklyStats() : this user has no recent weekly stats data");
+                        let jsonMessage = {
+                            "chat_id" : json.message.chat.id,
+                            "text" : "We don't have any information to give you about this week.",
+                        };
+                        sendTelegramMessage(jsonMessage, function(){
+                        if (err) {
+                            msg = "sendWeeklyStats() : error sending Telegram message. " + message;
+                            logger.error(msg);
+                            return;
+                        }
+                        })
+                        return;
+                    }
+
                     // take in some important weekly stats information
-                    let stats = data.Item.info;
+                    let stats = data.Items[0].info;
                     let HR = stats.HeartRate.avg;
                     // moves
                     let calories = stats.Moves.Calories.avg;
@@ -418,7 +430,6 @@ function sendWeeklyStats(json) {
                             msg = "sendWeeklyStats() : error sending Telegram message. " + message;
                             logger.error(msg);
                             return;
-
                         }
                     })
 

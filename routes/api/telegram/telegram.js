@@ -88,11 +88,9 @@ router.post('/new-message', function(req,res_body) {
         }
 
         if(json.message.hasOwnProperty("text")) {
-            console.log("It has a text property...");
             let text = json.message.text;
             text = text.toLowerCase();
             if (text.indexOf("average") > -1) {
-                console.log("It has average in it. calling function...");
                 sendWeeklyStats(json);
             } else {
                 msg = "Nothing to do.";
@@ -370,14 +368,13 @@ function sendWeeklyStats(json) {
                     logger.error(msg);
                     return;
                 } else {
-                    console.log("WeeklyStats: " + JSON.stringify(data, null, 2));
                     if (data.Count === 0) {
                         logger.info("sendWeeklyStats() : this user has no recent weekly stats data");
                         let jsonMessage = {
                             "chat_id" : json.message.chat.id,
                             "text" : "We don't have any information to give you about this week.",
                         };
-                        sendTelegramMessage(jsonMessage, function(){
+                        sendTelegramMessage(jsonMessage, function(err, message){
                         if (err) {
                             msg = "sendWeeklyStats() : error sending Telegram message. " + message;
                             logger.error(msg);

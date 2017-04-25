@@ -144,7 +144,7 @@ router.post('/askAboutWorkout', function(req,res_body){
 
 });
 
-// send a message to the users chat
+// function to send a message to the users chat
 function telegramRequest(userID, title, timestamp, callback) {
     api.getbotDetails(userID, function(botDetails) {
         let msg = "";

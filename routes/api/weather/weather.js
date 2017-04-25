@@ -138,6 +138,7 @@ router.post('/updateWorkoutWeather', function(req,res_body){
     });
 });
 
+// function to make a HTTP request to the OpenWeatherMap API
 function requestWeather(long, lat, callback) {
     let msg = "";
     let coords = "lat=" + lat + "&lon=" + long;
@@ -168,6 +169,7 @@ function requestWeather(long, lat, callback) {
     });
 }
 
+// function to store the obtained weather info into the given workout
 function putWeatherIntoWorkout(userID, timestamp, weather, callback) {
     let msg = "";
     const params = {

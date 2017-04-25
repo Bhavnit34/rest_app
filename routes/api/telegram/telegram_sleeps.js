@@ -15,6 +15,7 @@ AWS.config.update({
 const docClient = new AWS.DynamoDB.DocumentClient();
 const logger = loggerModule.getLogger();
 
+// function to check if the targetted sleep has had feedback associated with it
 function checkMoodExists(userID, timestamp, callback) {
     let msg = "";
     const params = {
@@ -217,7 +218,7 @@ router.post('/askAboutSleep', function(req,res_body){
 
 });
 
-// send a message to the users chat
+// function to send a message to the users chat
 function telegramRequest(userID, callback) {
     api.getbotDetails(userID, function(botDetails) {
         if (botDetails === null) {

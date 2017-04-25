@@ -127,7 +127,7 @@ router.get('/getRowCount', function(req, res_body) {
         };
 
 
-
+        // describe table gives info about the table, including the no. of rows
         dynamodb.describeTable(params, function(err, data) {
             if (err) {
                 msg = "Could not describe table: " + attr;

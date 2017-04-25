@@ -128,9 +128,12 @@ router.get('/:userId/', function(req,res){
 
         docClient.query(params, function (err, data) {
             if (err) {
-                logger.error("Unable to read item. Error JSON:", JSON.stringify(err, null, 2));
+                let msg = "Unable to read item. Error JSON:"+ (JSON.stringify(err, null, 2));
+                logger.error(msg);
+                returnJson.DynamoDB.message = msg;
+                returnJson.DynamoDB.error = true;
+                return res.status(500).send(returnJson);
             } else {
-                //logger.log("GetItem succeeded:", JSON.stringify(data, null, 2));
                 res.status(200).send(JSON.stringify(data, null, 2));
             }
         });

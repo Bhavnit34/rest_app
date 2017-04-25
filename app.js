@@ -26,7 +26,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(cors());
 
-// express-winston logger makes sense BEFORE the router.
+// set up express-winston logger
 app.use(expressWinston.logger({
     transports: [
         new winston.transports.Console({
@@ -98,7 +98,7 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
-// express-winston errorLogger makes sense AFTER the router.
+// set up express-winston errorLogger
 app.use(expressWinston.errorLogger({
     transports: [
         new winston.transports.Console({

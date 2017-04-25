@@ -15,6 +15,7 @@ AWS.config.update({
 const docClient = new AWS.DynamoDB.DocumentClient();
 const logger = loggerModule.getLogger();
 
+// function to check if the mood for the current day has been logged
 function checkMoodExists(userID, timestamp, callback) {
     const params = {
         TableName : "DailyMood",
@@ -40,6 +41,7 @@ function checkMoodExists(userID, timestamp, callback) {
     });
 }
 
+// function to obtain the user's latest awoken time
 function getAwokenTime(userID, timestamp, callback) {
     const params = {
         TableName: "Sleeps",
@@ -278,7 +280,7 @@ router.post('/askAboutDay', function(req,res_body){
 
 });
 
-// send a message to the users chat
+// function to send a message to the users chat
 function telegramRequest(userID, timestamp, callback) {
     api.getbotDetails(userID, function(botDetails) {
         if (botDetails === null) {

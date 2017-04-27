@@ -163,7 +163,7 @@ function telegramRequest(userID, title, timestamp, callback) {
         };
 
 
-        telegram.sendTelegramMessage(userID, json, function(error, message) {
+        telegram.sendTelegramMessage(json, function(error, message) {
             if (error) {
                 msg = 'telegramRequest() :  problem with request: ' + message;
                 logger.error(msg);

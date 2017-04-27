@@ -567,4 +567,4 @@ process.on('SIGTERM', exitHandler.bind(null, {exit:true}));
 process.on('uncaughtException', exitHandler.bind(null, {exit:true}));
 
 module.exports = router;
-module.exports.sendTelegramMessage = sendTelegramMessage;
+module.exports.sendTelegramMessage = sendTelegramMessage; // allows the function to be called from other modules

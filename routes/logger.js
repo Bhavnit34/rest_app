@@ -1,6 +1,5 @@
 // Module to construct a winston logger for any module that requires it.
 var winston = require('winston');
-var fs = require('fs');
 var args = require('../args');
 
 var winstonLogger = new (winston.Logger)({
@@ -20,6 +19,7 @@ var winstonLogger = new (winston.Logger)({
     exitOnError: false
 });
 
+// allows the function to be called from other modules
 module.exports = {
     getLogger : function() { return winstonLogger;}
 };

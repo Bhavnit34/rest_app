@@ -168,7 +168,14 @@ router.post('/askAboutSleep', function(req,res_body){
                         logger.error(msg);
                         return callback(true, 500, "DynamoDB", msg);
                     } else {
-                        const move = data;
+                        let move = data;
+
+                        // end if we don't have any moves info
+                        if (data.Count === 0) {
+                            msg = "askAboutSleep(): no Moves information available";
+                            logger.info(msg);
+                            return callback(false, 200, "DynamoDB", msg);
+                        }
 
                         // find correct hour to query active_time from
                         let hour = api.pad(now.getHours(), 2).toString();
